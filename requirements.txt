@@ -3,3 +3,8 @@ conda install -c anaconda beautifulsoup4
 conda install pandas
 conda install -c anaconda requests
 pip install analyst_data_views
+
+'''
+tried this
+pip3 install -e analyst_data_views --extra-index-url=http://pypi.mosaic.hartreepartners.com/simple --trusted-host=pypi.mosaic.hartreepartners.com
+'''

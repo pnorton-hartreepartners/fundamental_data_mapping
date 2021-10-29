@@ -14,10 +14,10 @@ os.environ['MOSAIC_ENV'] = 'DEV'
 
 import pandas as pd
 import datetime as dt
-from analyst_data_views.common.db_flattener import getFlatRawDF
+from analyst_data_views.common.db_flattener import getFlatRawDF, getRawDF
 from eia_hierarchy_definitions import hierarchy_dict_us_stocks
-from constants import path, file_for_mosaic_data, file_for_norm_data, file_for_pivot_data, \
-    file_for_metadata, SOURCE_KEY
+from constants import path, file_for_mosaic_data, xlsx_for_analysis, \
+    file_for_metadata, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION
 
 LOAD = 'load'
 SAVE = 'save'
@@ -87,61 +87,60 @@ if __name__ == '__main__':
     data_mode = LOAD
     source_key = 'WTTSTUS1'
 
-    pathfile = os.path.join(path, file_for_mosaic_data)
     if data_mode == SAVE:
-        df = getFlatRawDF(source='eia-weekly')
-        df.to_pickle(pathfile)
+        # symbol, date, value format
+        timeseries_df = getFlatRawDF(source='eia-weekly')
+        pathfile = os.path.join(path, file_for_mosaic_data)
+        timeseries_df.to_pickle(pathfile)
     elif data_mode == LOAD:
-        df = pd.read_pickle(pathfile)
+        pathfile = os.path.join(path, file_for_mosaic_data)
+        timeseries_df = pd.read_pickle(pathfile)
     else:
         raise NotImplementedError
 
+    # get all metadata and save to file
+    columns = [SOURCE_KEY, DESCRIPTION, TAB_DESCRIPTION, LOCATION]
+    metadata_df = get_metadata_df(timeseries_df, columns)
+    pathfile = os.path.join(path, file_for_metadata)
+    metadata_df.to_pickle(pathfile)
+
+    # =================================================================
+    # do some analysis; compare the total with the sum of the parts
+
     # select which hierarchy mapping to look at and build comparison to calc diffs
     selection = hierarchy_dict_us_stocks[source_key]
-    comparison_df = build_comparison(df, source_key=source_key, source_keys=selection)
-    mask = comparison_df.index > dt.date(2015, 1, 1)
-    comparison_df[mask].to_clipboard()
+    comparison_df = build_comparison(timeseries_df, source_key=source_key, source_keys=selection)
 
-    # get all metadata for all keys
-    all_keys = selection + [source_key]
-    columns = [SOURCE_KEY, 'Description', 'TabDescription', 'Location']
-    metadata_df = get_metadata_df(df, columns, all_keys)
-
-    # select just one field here and get a dict mapping source_key to label
-    label = 'Description'
-    metadata_dict = get_single_metadata_dict_for_all_symbols(metadata_df, label=label)
+    # =================================================================
+    # do some more analysis; report the total and the parts as a pivot
 
     # collect timeseries for all the component symbols and pivot
-    df_norm = get_components_df(df, selection)
+    df_norm = get_components_df(timeseries_df, selection)
     df_norm.set_index(DATE, drop=True, inplace=True)
     df_norm = df_norm[[SOURCE_KEY, VALUE]]
     df_pivot = get_components_pivot_df(df_norm)
 
     # get total
-    df_total = get_subtotal_df(df, source_key)
+    df_total = get_subtotal_df(timeseries_df, source_key)
 
-    # append the total to the pivot
+    # append the total to the pivot and sort
     df_combo = pd.concat([df_pivot, df_total], axis='columns')
+    df_combo.sort_index(inplace=True)
 
     # rename columns on pivot
+    # select just one field here and get a dict mapping source_key to label
+    metadata_dict = get_single_metadata_dict_for_all_symbols(metadata_df, label=DESCRIPTION)
     mapper = {k: v.replace('Ending Stocks of ', '') for k, v in metadata_dict.items()}
     mapper = {k: v.replace('Ending Stocks', '') for k, v in mapper.items()}
     df_combo.rename(columns=mapper, inplace=True)
 
-    # sort on date & filter to remove dodgy history
-    df_combo.sort_index(inplace=True)
+    # filter to remove dodgy history
     mask = df_combo.index > dt.date(2015, 1, 1)
-    df_combo[mask].to_clipboard()
+    df_combo = df_combo[mask]
 
-    # save locally
-    suffix = source_key + '.pkl'
-    pathfile = os.path.join(path, file_for_norm_data)
-    df_norm.to_pickle(pathfile + suffix)
-    pathfile = os.path.join(path, file_for_pivot_data)
-    df_combo.to_pickle(pathfile + suffix)
-    pathfile = os.path.join(path, file_for_metadata)
-    metadata_df.to_pickle(pathfile + suffix)
-
+    # save as xls
     chart_title = metadata_dict[source_key]
-
-    print('hello world')
+    pathfile = os.path.join(path, xlsx_for_analysis)
+    with pd.ExcelWriter(pathfile) as writer:
+        df_norm.to_excel(writer, sheet_name='df_norm')
+        df_combo.to_excel(writer, sheet_name='df_combo')
