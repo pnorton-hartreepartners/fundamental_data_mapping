@@ -1,13 +1,9 @@
 import os
 import pandas as pd
 from collections import namedtuple
-from constants import path, SOURCE_KEY
+from constants import SOURCE_KEY, TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION
 
-DESCRIPTION = 'description'
 REMAINING_DESCRIPTION = 'remaining description'
-TAB_DESCRIPTION = 'TabDescription'
-LOCATION = 'Location'
-UNIT = 'Unit'
 MAP_PRODUCT = 'map_product'
 MAP_MEASURE = 'map_measure'
 MAP_LOCATION = 'map_location'

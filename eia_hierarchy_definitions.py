@@ -1,3 +1,29 @@
+import pandas as pd
+import os
+from constants import path, file_for_scrape, TAB_DESCRIPTION
+
+# ======================================
+# import the datafile to a df
+
+pathfile = os.path.join(path, file_for_scrape)
+df_scrape = pd.read_pickle(pathfile)
+
+# ======================================
+# filter for headline stocks data
+
+# weird pandas feature == operator doesnt work here
+mask = df_scrape['level'].eq(0) & df_scrape[TAB_DESCRIPTION].eq('Stocks')
+
+list_of_symbols = list(df_scrape[mask].index)
+key = list_of_symbols.pop(0)
+
+# remove this its not part of the hierarchy
+# Total Crude Oil and Petroleum Products (Excl. SPR)
+list_of_symbols.remove('WTESTUS1')
+
+hierarchy_dict_us_stocks = {key: list_of_symbols}
+
+'''
 hierarchy_dict_us_stocks = {
     # ======================================
     'WTTSTUS1':
@@ -88,3 +114,4 @@ other_dict = {
          'WRESTUS1',
          'WPRSTUS1',
          'W_EPPO6_SAE_NUS_MBBL']}
+'''

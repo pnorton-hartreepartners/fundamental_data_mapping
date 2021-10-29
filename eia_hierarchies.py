@@ -5,9 +5,6 @@ from oil_data_etl.default_entities.geo import getDefaultHierarchy as geoHierarch
 from oil_data_etl.default_entities.products import getDefaultHierarchy as productsHierarchy
 from oil_data_etl.default_entities.measures import getDefaultHierarchy as measuresHierarchy
 
-'''
-activate sandbox
-'''
 
 if __name__ == '__main__':
     p = productsHierarchy()

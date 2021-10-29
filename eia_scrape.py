@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import os
-from constants import path, file_for_scrape, file_for_metadata, SOURCE_KEY
+from constants import path, file_for_scrape, file_for_metadata, SOURCE_KEY, LOCATION
 
 url = r'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm'
 html = requests.get(url).content
@@ -47,7 +47,7 @@ triples = zip(texts, [level_lookup[indent] for indent in indents], source_keys)
 triples = list(triples)
 
 # create a dataframe to set up the analysis
-columns = ['text', 'level', 'source_key']
+columns = ['text', 'level', SOURCE_KEY]
 df = pd.DataFrame(data=triples, columns=columns)
 
 # ==================================================
@@ -87,11 +87,11 @@ for i, row in df.iterrows():
 
     # update the lists and the df
     text_list.append(row['text'])
-    symbol_list.append(row['source_key'])
+    symbol_list.append(row[SOURCE_KEY])
     df.at[i, 'hierarchy_text'] = text_list.copy()
     df.at[i, 'hierarchy_symbol'] = symbol_list.copy()
 
-df.set_index('source_key', drop=True, inplace=True)
+df.set_index(SOURCE_KEY, drop=True, inplace=True)
 
 # ==================================================
 # create hierarchy this time as a flat dataframe of symbols
@@ -109,7 +109,7 @@ tree_columns = hierarchy_df.columns
 meta_columns = metadata_df.columns
 scrape_columns = ['text', 'level', 'level_change']
 
-mask = metadata_df['Location'] == 'U.S.'
+mask = metadata_df[LOCATION] == 'U.S.'
 metadata_df = metadata_df[mask]
 report_df = hierarchy_df.join(metadata_df).join(df)
 report_df = report_df[scrape_columns + list(meta_columns) + list(tree_columns)]
@@ -119,8 +119,3 @@ report_df = report_df[scrape_columns + list(meta_columns) + list(tree_columns)]
 
 pathfile = os.path.join(path, file_for_scrape)
 report_df.to_pickle(pathfile)
-
-report_df.to_clipboard()
-print('hello world')
-
-
