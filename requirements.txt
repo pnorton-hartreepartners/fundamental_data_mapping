@@ -1,0 +1,4 @@
+conda create -n fundamental_data_mapping python=3.6
+conda install -c anaconda beautifulsoup4
+conda install pandas
+pip install analyst_data_views
