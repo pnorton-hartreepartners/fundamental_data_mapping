@@ -1,7 +1,6 @@
 path = r'C:\Temp'
 file_for_mosaic_data = 'eia-weekly.pkl'
 file_for_metadata = 'eia-weekly-metadata.pkl'
-file_for_extended_metadata = 'eia-weekly-extended-metadata.pkl'  # this is used for mapping
 file_for_scrape = 'eia-weekly-scrape.pkl '
 
 xlsx_for_timeseries_analysis = 'eia-weekly-timeseries-analysis.xlsx'
@@ -15,3 +14,5 @@ UNIT = 'Unit'
 DESCRIPTION = 'Description'
 LOAD = 'load'
 SAVE = 'save'
+
+metadata_reduced_columns = [DESCRIPTION, TAB_DESCRIPTION, LOCATION, UNIT]

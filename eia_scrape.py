@@ -19,7 +19,8 @@ from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import os
-from constants import path, file_for_scrape, file_for_metadata, xlsx_for_scrape_result, SOURCE_KEY, LOCATION
+from constants import path, file_for_scrape, file_for_metadata, xlsx_for_scrape_result, \
+    SOURCE_KEY, LOCATION, metadata_reduced_columns
 
 url = r'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm'
 html = requests.get(url).content
@@ -106,9 +107,9 @@ for i, row in df.iterrows():
 # ==================================================
 # join everything up
 
-tree_columns = hierarchy_df.columns
-meta_columns = metadata_df.columns
 scrape_columns = ['text', 'level', 'level_change']
+meta_columns = metadata_reduced_columns
+tree_columns = hierarchy_df.columns
 
 mask = metadata_df[LOCATION] == 'U.S.'
 metadata_df = metadata_df[mask]

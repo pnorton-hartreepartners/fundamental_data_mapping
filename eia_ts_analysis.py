@@ -11,7 +11,7 @@ import datetime as dt
 from eia_hierarchy_definitions import hierarchy_dict_us_stocks
 from metadata import get_single_metadata_dict_for_all_symbols, get_metadata_df
 from constants import path, file_for_mosaic_data, xlsx_for_timeseries_analysis, \
-    file_for_extended_metadata, SOURCE_KEY, DESCRIPTION
+    file_for_metadata, SOURCE_KEY, DESCRIPTION
 
 SUBTOTAL = 'subtotal'
 CALCULATED = 'calculated'
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     timeseries_df = pd.read_pickle(pathfile)
 
     # load metadata
-    pathfile = os.path.join(path, file_for_extended_metadata)
+    pathfile = os.path.join(path, file_for_metadata)
     metadata_df = pd.read_pickle(pathfile)
 
     # =================================================================

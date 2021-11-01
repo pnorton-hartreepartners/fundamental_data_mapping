@@ -8,7 +8,7 @@ import os
 import pandas as pd
 from collections import namedtuple
 from constants import TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION, \
-    path, file_for_extended_metadata, xlsx_for_mapping_result
+    path, file_for_metadata, xlsx_for_mapping_result
 
 REMAINING_DESCRIPTION = 'remaining description'
 MAP_PRODUCT = 'map_product'
@@ -23,8 +23,10 @@ INTRA_COUNTRY_REGION = 'intra_country_region'
 MEASURE = 'measure'
 SUB_MEASURE = 'sub_measure'
 
+# dictionary of mappings to list of string searches
+# if a string search of the description field matches
+# then the associated key is the mapping
 product_mapping = {
-    # category to list of members
     'crude oil': ['crude oil'],
     'motor gasoline blending components': [
         'conventional other gasoline blending components',
@@ -55,6 +57,7 @@ product_mapping = {
                           'propane and propylene']
 }
 
+# these are 1:1 string searches
 sub_product_mapping = {'conventional': 'conventional',
                        'reformulated': 'reformulated',
                        'diesel': 'distillate fuel oil greater than 15 to 500 ppm sulfur',
@@ -62,7 +65,8 @@ sub_product_mapping = {'conventional': 'conventional',
                        'gtab': 'gtab',
                        'kerosene-type jet fuel': 'kerosene-type jet fuel'}
 
-
+# this dictionary works in the opposite direction
+# now if the key matches; the value is a dictionary that represents the mosaic mapping
 location_mapping = {
     'East Coast (PADD 1)': {INTRA_COUNTRY_REGION: 'PADD I'},
     'Gulf Coast (PADD 3)': {INTRA_COUNTRY_REGION: 'PADD III'},
@@ -75,6 +79,7 @@ location_mapping = {
     'U.S.': {COUNTRY: 'United States'},
 }
 
+# again if the key matches; the value is a dictionary that represents the mosaic mapping
 measure_mapping = {
     'Imports': {MEASURE: 'imports', SUB_MEASURE: ''},  # this is new
     'Crude Oil Production': {MEASURE: 'imports', SUB_MEASURE: ''},
@@ -92,6 +97,7 @@ measure_mapping = {
     'Weekly Preliminary Crude Imports by Top 10 Countries of Origin (ranking based on 2018 Petroleum Supply Monthly data)': {MEASURE: 'imports', SUB_MEASURE: ''},
 }
 
+# again if the key matches; the value is a dictionary that represents the mosaic mapping
 unit_mapping = {
     'Thousand Barrels per Day': {'unit': 'kbd'},
     'Thousand Barrels': {'unit': 'kb'},
@@ -109,15 +115,15 @@ corrections_mapping = {
 
 
 if __name__ == '__main__':
-    # load the data
-    file = os.path.join(path, file_for_extended_metadata)
-    extended_metadata_df = pd.read_pickle(file)
+    # load the metadata
+    file = os.path.join(path, file_for_metadata)
+    metadata_df = pd.read_pickle(file)
 
     # standardise the label and the content
-    extended_metadata_df[DESCRIPTION] = extended_metadata_df['Description'].str.lower()
-    extended_metadata_df.drop('Description', axis='columns')
+    metadata_df[DESCRIPTION] = metadata_df['Description'].str.lower()
+    metadata_df.drop('Description', axis='columns')
 
-    analysis_df = extended_metadata_df.copy(deep=True)
+    analysis_df = metadata_df.copy(deep=True)
     # append new columns
     analysis_df[REMAINING_DESCRIPTION] = ''
     analysis_df[MAP_PRODUCT] = ''
@@ -163,4 +169,3 @@ if __name__ == '__main__':
     pathfile = os.path.join(path, xlsx_for_mapping_result)
     with pd.ExcelWriter(pathfile) as writer:
         report_df.to_excel(writer, sheet_name='mapping_result')
-    print()
