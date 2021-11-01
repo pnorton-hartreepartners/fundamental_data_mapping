@@ -1,3 +1,8 @@
+'''
+this is just a playpen for mosaic hierarchy functions
+no output from this script
+'''
+
 import os
 import pandas as pd
 from oil_data_etl.common.model.Hierarchy import Hierarchy

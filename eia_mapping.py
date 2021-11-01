@@ -1,7 +1,14 @@
+'''
+this script contains the mapping data
+and steps through the mapping process
+output is an xls for human consumption
+'''
+
 import os
 import pandas as pd
 from collections import namedtuple
-from constants import SOURCE_KEY, TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION
+from constants import TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION, \
+    path, file_for_extended_metadata, xlsx_for_mapping_result
 
 REMAINING_DESCRIPTION = 'remaining description'
 MAP_PRODUCT = 'map_product'
@@ -102,58 +109,58 @@ corrections_mapping = {
 
 
 if __name__ == '__main__':
-    filepath = r'C:\Users\PNorton\OneDrive - Hartree Partners\Documents\jira\doe mapping'
-    filename = r'eia_weekly_202110071437'
-    filetype = r'.xlsx'
-
-    # load the xls
-    file = os.path.join(filepath, filename + filetype)
-    raw_df = pd.read_excel(file)
+    # load the data
+    file = os.path.join(path, file_for_extended_metadata)
+    extended_metadata_df = pd.read_pickle(file)
 
     # standardise the label and the content
-    raw_df[DESCRIPTION] = raw_df['Description'].str.lower()
-    raw_df.drop('Description', axis='columns')
+    extended_metadata_df[DESCRIPTION] = extended_metadata_df['Description'].str.lower()
+    extended_metadata_df.drop('Description', axis='columns')
 
-    df_analysis = raw_df.copy(deep=True)
+    analysis_df = extended_metadata_df.copy(deep=True)
     # append new columns
-    df_analysis[REMAINING_DESCRIPTION] = ''
-    df_analysis[MAP_PRODUCT] = ''
-    df_analysis[MAP_MEASURE] = ''
-    df_analysis[MAP_LOCATION] = ''
-    df_analysis[REMAINING_DESCRIPTION] = df_analysis[DESCRIPTION].str.lower()
+    analysis_df[REMAINING_DESCRIPTION] = ''
+    analysis_df[MAP_PRODUCT] = ''
+    analysis_df[MAP_MEASURE] = ''
+    analysis_df[MAP_LOCATION] = ''
+    analysis_df[REMAINING_DESCRIPTION] = analysis_df[DESCRIPTION].str.lower()
 
     # text search description to determine product
     for key, searches in product_mapping.items():
         for search in searches:
             # regex search returns series of boolean
             pattern = f'\\b({search})\\b'
-            df = df_analysis[DESCRIPTION].str.contains(pattern)
+            df = analysis_df[DESCRIPTION].str.contains(pattern)
             df.name = key + '|' + search
             # add a column with the boolean flag
-            df_analysis = pd.concat([df_analysis, df], axis='columns')
+            analysis_df = pd.concat([analysis_df, df], axis='columns')
             # remove the search text from the description so we can see whats left
-            df_analysis[REMAINING_DESCRIPTION] = df_analysis[REMAINING_DESCRIPTION].str.replace(pattern, '', regex=True)
+            analysis_df[REMAINING_DESCRIPTION] = analysis_df[REMAINING_DESCRIPTION].str.replace(pattern, '', regex=True)
             # add the product mapping category
-            df_analysis.loc[df.values, MAP_PRODUCT] = key
+            analysis_df.loc[df.values, MAP_PRODUCT] = key
         # turn boolean into integer values so we can sum them
-        df_analysis[[key + '|' + s for s in searches]] = df_analysis[[key + '|' + s for s in searches]].applymap(lambda x: int(x))
+        analysis_df[[key + '|' + s for s in searches]] = analysis_df[[key + '|' + s for s in searches]].applymap(lambda x: int(x))
 
     # simple mapping
-    df_analysis[MAP_MEASURE] = df_analysis[TAB_DESCRIPTION].map(measure_mapping)
-    df_analysis[MAP_LOCATION] = df_analysis[LOCATION].map(location_mapping)
-    df_analysis[MAP_UNIT] = df_analysis[UNIT].map(unit_mapping)
+    analysis_df[MAP_MEASURE] = analysis_df[TAB_DESCRIPTION].map(measure_mapping)
+    analysis_df[MAP_LOCATION] = analysis_df[LOCATION].map(location_mapping)
+    analysis_df[MAP_UNIT] = analysis_df[UNIT].map(unit_mapping)
 
-    # corrections
+    # corrections to measures
     for correction in corrections_mapping[MAP_MEASURE]:
-        df = df_analysis[DESCRIPTION].str.contains(correction.search)
-        df_analysis.loc[df.values, MAP_MEASURE] = correction.replace
+        df = analysis_df[DESCRIPTION].str.contains(correction.search)
+        analysis_df.loc[df.values, MAP_MEASURE] = correction.replace
 
+    # simple string search for sub-product mappings
     for key, search in sub_product_mapping.items():
-        df = df_analysis[DESCRIPTION].str.contains(search)
-        df_analysis.loc[df.values, MAP_SUBPRODUCT] = key
+        df = analysis_df[DESCRIPTION].str.contains(search)
+        analysis_df.loc[df.values, MAP_SUBPRODUCT] = key
 
-    columns = [SOURCE_KEY, TAB_DESCRIPTION, LOCATION, DESCRIPTION, REMAINING_DESCRIPTION, MAP_PRODUCT, MAP_SUBPRODUCT, MAP_MEASURE, MAP_LOCATION, MAP_UNIT]
-    df_report = df_analysis[columns]
+    columns = [TAB_DESCRIPTION, LOCATION, DESCRIPTION, REMAINING_DESCRIPTION, MAP_PRODUCT, MAP_SUBPRODUCT, MAP_MEASURE, MAP_LOCATION, MAP_UNIT]
+    report_df = analysis_df[columns]
 
-    df_report.to_clipboard()
+    # save as xls
+    pathfile = os.path.join(path, xlsx_for_mapping_result)
+    with pd.ExcelWriter(pathfile) as writer:
+        report_df.to_excel(writer, sheet_name='mapping_result')
     print()

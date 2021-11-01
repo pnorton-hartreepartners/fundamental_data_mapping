@@ -11,14 +11,15 @@ the first output is dataframe with:
 the second output is a dataframe with:
 - the tree of symbols as a flat structure ie one column per tree level
 - some metadata
-and we save this to a pkl file
+and we save this to a pkl file for consumption by other scripts
+and as an xls for review by humans
 '''
 
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import os
-from constants import path, file_for_scrape, file_for_metadata, SOURCE_KEY, LOCATION
+from constants import path, file_for_scrape, file_for_metadata, xlsx_for_scrape_result, SOURCE_KEY, LOCATION
 
 url = r'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm'
 html = requests.get(url).content
@@ -116,6 +117,10 @@ report_df = report_df[scrape_columns + list(meta_columns) + list(tree_columns)]
 
 # ==================================================
 # save to file
-
 pathfile = os.path.join(path, file_for_scrape)
 report_df.to_pickle(pathfile)
+
+# save as xls
+pathfile = os.path.join(path, xlsx_for_scrape_result)
+with pd.ExcelWriter(pathfile) as writer:
+    report_df.to_excel(writer, sheet_name='scrape_result')

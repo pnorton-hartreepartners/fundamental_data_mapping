@@ -1,26 +1,18 @@
 '''
-collect timeseries data from eia-weekly in mosaic and save as pkl
-derive metadata and save that as another pkl
-plus functions to select data based on dict of symbols
+functions to select data based on dict of hierarchy of symbols
  - test that the sum of the children equates to the parent
  - generate a pivotted df to chart the children and parent
+output is a pivotted df in an xls for human consumption
 '''
 
 import os
-os.environ['IGNITE_HOST_OVERWRITE'] = 'jdbc.dev.mosaic.hartreepartners.com'
-os.environ['TSDB_HOST'] = 'tsdb-dev.mosaic.hartreepartners.com'
-os.environ['CRATE_HOST'] = 'ttda.cratedb-dev-cluster.mosaic.hartreepartners.com:4200'
-os.environ['MOSAIC_ENV'] = 'DEV'
-
 import pandas as pd
 import datetime as dt
-from analyst_data_views.common.db_flattener import getFlatRawDF, getRawDF
 from eia_hierarchy_definitions import hierarchy_dict_us_stocks
-from constants import path, file_for_mosaic_data, xlsx_for_analysis, \
-    file_for_metadata, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION
+from metadata import get_single_metadata_dict_for_all_symbols, get_metadata_df
+from constants import path, file_for_mosaic_data, xlsx_for_timeseries_analysis, \
+    file_for_extended_metadata, SOURCE_KEY, DESCRIPTION
 
-LOAD = 'load'
-SAVE = 'save'
 SUBTOTAL = 'subtotal'
 CALCULATED = 'calculated'
 DATE = 'date'
@@ -69,40 +61,16 @@ def get_subtotal_df(df, source_key):
     return sub_total_df
 
 
-def get_all_metadata_for_symbol(metadata_df, source_key):
-    return list(metadata_df.loc[metadata_df[SOURCE_KEY] == source_key].values[0])
-
-
-def get_single_metadata_dict_for_all_symbols(metadata_df, label):
-    return dict(zip(metadata_df.index, metadata_df[label].values))
-
-
-def get_metadata_df(df, columns):
-    metadata_df = df[columns].drop_duplicates()
-    metadata_df.set_index(SOURCE_KEY, drop=True, inplace=True)
-    return metadata_df
-
-
 if __name__ == '__main__':
-    data_mode = LOAD
     source_key = 'WTTSTUS1'
 
-    if data_mode == SAVE:
-        # symbol, date, value format
-        timeseries_df = getFlatRawDF(source='eia-weekly')
-        pathfile = os.path.join(path, file_for_mosaic_data)
-        timeseries_df.to_pickle(pathfile)
-    elif data_mode == LOAD:
-        pathfile = os.path.join(path, file_for_mosaic_data)
-        timeseries_df = pd.read_pickle(pathfile)
-    else:
-        raise NotImplementedError
+    # load timeseries data
+    pathfile = os.path.join(path, file_for_mosaic_data)
+    timeseries_df = pd.read_pickle(pathfile)
 
-    # get all metadata and save to file
-    columns = [SOURCE_KEY, DESCRIPTION, TAB_DESCRIPTION, LOCATION]
-    metadata_df = get_metadata_df(timeseries_df, columns)
-    pathfile = os.path.join(path, file_for_metadata)
-    metadata_df.to_pickle(pathfile)
+    # load metadata
+    pathfile = os.path.join(path, file_for_extended_metadata)
+    metadata_df = pd.read_pickle(pathfile)
 
     # =================================================================
     # do some analysis; compare the total with the sum of the parts
@@ -140,7 +108,7 @@ if __name__ == '__main__':
 
     # save as xls
     chart_title = metadata_dict[source_key]
-    pathfile = os.path.join(path, xlsx_for_analysis)
+    pathfile = os.path.join(path, xlsx_for_timeseries_analysis)
     with pd.ExcelWriter(pathfile) as writer:
         df_norm.to_excel(writer, sheet_name='df_norm')
         df_combo.to_excel(writer, sheet_name='df_combo')

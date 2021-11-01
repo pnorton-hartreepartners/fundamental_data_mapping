@@ -1,6 +1,7 @@
 conda create -n fundamental_data_mapping python=3.6
 conda install -c anaconda beautifulsoup4
 conda install pandas
+conda install -c anaconda openpyxl
 conda install -c anaconda requests
 pip install analyst_data_views
 
