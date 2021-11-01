@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import datetime as dt
 from eia_hierarchy_definitions import hierarchy_dict_us_stocks
-from metadata import get_single_metadata_dict_for_all_symbols, get_metadata_df
+from eia_metadata import get_single_metadata_dict_for_all_symbols
 from constants import path, file_for_mosaic_data, xlsx_for_timeseries_analysis, \
     file_for_metadata, SOURCE_KEY, DESCRIPTION
 

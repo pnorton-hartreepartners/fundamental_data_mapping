@@ -8,7 +8,7 @@ import pandas as pd
 from analyst_data_views.common.db_flattener import getFlatRawDF
 from constants import path, file_for_mosaic_data, \
     file_for_metadata, SAVE, LOAD
-from metadata import get_metadata_df
+from eia_metadata import get_metadata_df
 
 
 if __name__ == '__main__':
