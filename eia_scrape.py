@@ -22,106 +22,156 @@ import os
 from constants import path, file_for_scrape, file_for_metadata, xlsx_for_scrape_result, \
     SOURCE_KEY, LOCATION, metadata_reduced_columns
 
-url = r'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm'
-html = requests.get(url).content
-soup = BeautifulSoup(html, 'html.parser')
+urls = [
+    'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r10_w.htm',  # padd1
+    'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r20_w.htm',  # padd2
+    'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r30_w.htm',  # padd3
+    'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r40_w.htm',  # padd4
+    'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r50_w.htm',  # padd5
+    'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm',  # us
+]
+scrape_columns = ['text', 'level', SOURCE_KEY, 'year_start', 'year_end']
 
-# access html data cells
-tds = soup.find_all('td', {'class': 'DataStub1'})
 
-# find the text and the indent
-texts = [str(td.contents[0]) for td in tds]
-indents = [td.find_previous('td').get('width') for td in tds]
-indents = [int(ii) for ii in indents]
+def get_soups_for_urls(urls):
+    soups = []
+    for url in urls:
+        url = r'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm'
+        html = requests.get(url).content
+        soup = BeautifulSoup(html, 'html.parser')
+        soups.append(soup)
+    return soups
 
-# find the source key; this should be a regex
-urls = [td.find_next('a').get('href') for td in tds]
-start, end = 32, -4
-source_keys = [url[start:end] for url in urls]
 
-# turn the indents into levels and then create a mapping lookup dict
-uniques = sorted(list(set(indents)))
-levels = list(range(len(uniques)))
-level_lookup = dict(zip(uniques, levels))
+def get_soup_to_df(soup):
+    # access html data cells
+    tds = soup.find_all('td', {'class': 'DataStub1'})
 
-# join it all up
-triples = zip(texts, [level_lookup[indent] for indent in indents], source_keys)
-triples = list(triples)
+    # find the text and the indent
+    texts = [str(td.contents[0]) for td in tds]
+    indents = [td.find_previous('td').get('width') for td in tds]
+    indents = [int(ii) for ii in indents]
 
-# create a dataframe to set up the analysis
-columns = ['text', 'level', SOURCE_KEY]
-df = pd.DataFrame(data=triples, columns=columns)
+    # theres a link at the end of each row with some useful data
+    hyperlinks = [td.find_next('a') for td in tds]
 
-# ==================================================
-# get saved metadata
-pathfile = os.path.join(path, file_for_metadata)
-metadata_df = pd.read_pickle(pathfile)
+    # get the source key from the url; this should be a regex but for now we're cheating with string slicing
+    urls = [hyperlink.get('href') for hyperlink in hyperlinks]
+    start, end = 32, -4
+    source_keys = [url[start:end] for url in urls]
 
-# ==================================================
-# create hierarchy as a list in a single column
+    # a year applies string is part of the link text
+    year_ranges = [list(hyperlink.strings)[0] for hyperlink in hyperlinks]
+    year_ranges = [year_range.split('-') for year_range in year_ranges]
+    year_ranges = [[int(year_range[0]), int(year_range[1])] for year_range in year_ranges]
 
-# first order difference
-df['level_change'] = df['level'] - df['level'].shift(periods=1, axis='index', fill_value=0)
+    # turn the indents into levels and then create a mapping lookup dict
+    uniques = sorted(list(set(indents)))
+    levels = list(range(len(uniques)))
+    level_lookup = dict(zip(uniques, levels))
 
-# initialise column and change type to accept list
-df['hierarchy_text'] = None
-df['hierarchy_text'] = df['hierarchy_text'].astype('object')
-df['hierarchy_symbol'] = None
-df['hierarchy_symbol'] = df['hierarchy_symbol'].astype('object')
+    # join it all up
+    data = zip(texts,
+               [level_lookup[indent] for indent in indents],
+               source_keys,
+               [year_range[0] for year_range in year_ranges],  # year_start
+               [year_range[1] for year_range in year_ranges],  # year_end
+               )
 
-text_list, symbol_list = [], []
-for i, row in df.iterrows():
-    # extend the list ie dont pop
-    if row['level_change'] >= 1:
-        pop_count = 0
+    # return a dataframe
+    return pd.DataFrame(data=list(data), columns=scrape_columns)
 
-    # even if the list length is unchanged, we pop once to replace with the new value
-    else:
-        pop_count = abs(row['level_change']) + 1
 
-    # pop the required number of times
-    for _ in range(pop_count):
-        try:
-            text_list.pop()
-            symbol_list.pop()
-        except IndexError as err:
-            pass
+def build_hierarchy_from_indent(df):
+    # first order difference
+    df['level_change'] = df['level'] - df['level'].shift(periods=1, axis='index', fill_value=0)
 
-    # update the lists and the df
-    text_list.append(row['text'])
-    symbol_list.append(row[SOURCE_KEY])
-    df.at[i, 'hierarchy_text'] = text_list.copy()
-    df.at[i, 'hierarchy_symbol'] = symbol_list.copy()
+    # initialise column and change type to accept list
+    df['hierarchy_text'] = None
+    df['hierarchy_text'] = df['hierarchy_text'].astype('object')
+    df['hierarchy_symbol'] = None
+    df['hierarchy_symbol'] = df['hierarchy_symbol'].astype('object')
+    text_list, symbol_list = [], []
 
-df.set_index(SOURCE_KEY, drop=True, inplace=True)
+    for i, row in df.iterrows():
+        # extend the list ie dont pop
+        if row['level_change'] >= 1:
+            pop_count = 0
 
-# ==================================================
-# create hierarchy this time as a flat dataframe of symbols
+        # even if the list length is unchanged, we pop once to replace with the new value
+        else:
+            pop_count = abs(row['level_change']) + 1
 
-max_depth = df['hierarchy_symbol'].apply(len).max()
-hierarchy_df = pd.DataFrame(data=None, index=df.index, columns=range(max_depth))
-for i, row in df.iterrows():
-    padded_leaves = row['hierarchy_symbol'] + [''] * (max_depth - len(row['hierarchy_symbol']))
-    hierarchy_df.loc[i] = padded_leaves
+        # pop the required number of times
+        for _ in range(pop_count):
+            try:
+                text_list.pop()
+                symbol_list.pop()
+            except IndexError as err:
+                pass
 
-# ==================================================
-# join everything up
+        # update the lists and the df
+        text_list.append(row['text'])
+        symbol_list.append(row[SOURCE_KEY])
+        df.at[i, 'hierarchy_text'] = text_list.copy()
+        df.at[i, 'hierarchy_symbol'] = symbol_list.copy()
+    df.set_index(SOURCE_KEY, drop=True, inplace=True)
+    return df
 
-scrape_columns = ['text', 'level', 'level_change']
-meta_columns = metadata_reduced_columns
-tree_columns = hierarchy_df.columns
 
-mask = metadata_df[LOCATION] == 'U.S.'
-metadata_df = metadata_df[mask]
-report_df = hierarchy_df.join(metadata_df).join(df)
-report_df = report_df[scrape_columns + list(meta_columns) + list(tree_columns)]
+def build_flat_hierarchy_from_list(df):
+    max_depth = df['hierarchy_symbol'].apply(len).max()
+    hierarchy_df = pd.DataFrame(data=None, index=df.index, columns=range(max_depth))
+    for i, row in df.iterrows():
+        padded_leaves = row['hierarchy_symbol'] + [''] * (max_depth - len(row['hierarchy_symbol']))
+        hierarchy_df.loc[i] = padded_leaves
+    return hierarchy_df
 
-# ==================================================
-# save to file
-pathfile = os.path.join(path, file_for_scrape)
-report_df.to_pickle(pathfile)
 
-# save as xls
-pathfile = os.path.join(path, xlsx_for_scrape_result)
-with pd.ExcelWriter(pathfile) as writer:
-    report_df.to_excel(writer, sheet_name='scrape_result')
+def build_report_df(hierarchy_df, metadata_df, flat_hierarchy_df, scrape_columns=scrape_columns):
+    # define columns
+    scrape_columns = scrape_columns + ['level_change']
+    scrape_columns.remove(SOURCE_KEY)  # because its the index now
+    meta_columns = metadata_reduced_columns
+    flat_hierarchy_columns = flat_hierarchy_df.columns
+
+    # join and return the new df
+    report_df = hierarchy_df.join(metadata_df).join(flat_hierarchy_df)
+    return report_df[scrape_columns + list(meta_columns) + list(flat_hierarchy_columns)]
+
+
+if __name__ == '__main__':
+    # get saved metadata
+    pathfile = os.path.join(path, file_for_metadata)
+    metadata_df = pd.read_pickle(pathfile)
+
+    # simple parser
+    soups = get_soups_for_urls(urls)
+    # soups = [soups[-1]]
+    dfs = []
+    for soup in soups:
+        dfs.append(get_soup_to_df(soup))
+
+    # derive hierarchy from indent as a level number
+    hierarchy_df = pd.DataFrame()
+    for df in dfs:
+        new_df = build_hierarchy_from_indent(df)
+        hierarchy_df = pd.concat([hierarchy_df, new_df], axis='rows')
+
+    # prepare for upload by building a flat hierarchy version w integer column names
+    flat_hierarchy_df = pd.DataFrame()
+    for df in dfs:
+        new_df = build_flat_hierarchy_from_list(df)
+        flat_hierarchy_df = pd.concat([flat_hierarchy_df, new_df], axis='rows')
+
+    # join everything up
+    report_df = build_report_df(hierarchy_df, metadata_df, flat_hierarchy_df)
+
+    # save to file
+    pathfile = os.path.join(path, file_for_scrape)
+    report_df.to_pickle(pathfile)
+
+    # save as xls
+    pathfile = os.path.join(path, xlsx_for_scrape_result)
+    with pd.ExcelWriter(pathfile) as writer:
+        report_df.to_excel(writer, sheet_name='scrape_result')

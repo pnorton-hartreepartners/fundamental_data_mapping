@@ -4,6 +4,7 @@ for consumption by timeseries analysis
 '''
 import pandas as pd
 import os
+import datetime as dt
 from constants import path, file_for_scrape, TAB_DESCRIPTION
 
 # ======================================
@@ -12,16 +13,21 @@ pathfile = os.path.join(path, file_for_scrape)
 scrape_df = pd.read_pickle(pathfile)
 
 # ======================================
-# filter for headline stocks data
+# filter for headline stocks data ie level zero
+
+# we dont want expired symbols
+current_year = dt.date.today().year
 
 # weird pandas feature == operator doesnt work here
-mask = scrape_df['level'].eq(0) & scrape_df[TAB_DESCRIPTION].eq('Stocks')
+mask = scrape_df['level'].eq(0) \
+       & scrape_df[TAB_DESCRIPTION].eq('Stocks') \
+       & scrape_df['year_end'].eq(current_year)
 
 # the first symbol in the list is the total of everything; so make it the key
 list_of_symbols = list(scrape_df[mask].index)
 key = list_of_symbols.pop(0)
 
-# remove this its not part of the hierarchy
+# remove this as its not part of the hierarchy
 # Total Crude Oil and Petroleum Products (Excl. SPR)
 list_of_symbols.remove('WTESTUS1')
 
