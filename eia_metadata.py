@@ -1,8 +1,10 @@
 '''
 functions for building and using metadata
 '''
-
-from constants import SOURCE_KEY
+import os
+import pandas as pd
+from constants import path, file_for_metadata, SOURCE_KEY, DESCRIPTION, LOCATION, file_for_scrape, xlsx_for_enriched_metadata, \
+scrape_data_reduced_columns
 
 
 def get_all_metadata_for_symbol(metadata_df, source_key):
@@ -18,3 +20,52 @@ def get_metadata_df(df, columns):
     metadata_df.set_index(SOURCE_KEY, drop=True, inplace=True)
     return metadata_df
 
+
+def clean_description_metadata_df(df):
+    list_of_replacements = [('Ending Stocks of ', ''), ('Ending Stocks', ''),
+                            ('Exports of ', ''), ('Exports', ''),
+                            ('Imports of ', ''), ('Imports from ', ''), ('Imports', ''),
+                            ('Net Production of ', ''), ('Net Production', ''),
+                            ('Net Input of ', ''), ('Net Input', ''),
+                            ('Days of Supply of ', ''),
+                            ('Product Supplied of ', ''),
+                            ('Refiner and Blender', ''), ('Refiner Blender and ', ''),
+                            (' of Crude Oil', '')
+                            ]
+
+    df['name'] = df[DESCRIPTION]
+    for replacement in list_of_replacements:
+        df['name'] = df['name'].replace(*replacement)
+
+    df['name'].str.lstrip(' ')
+    df['name'].str.capitalize()
+
+
+def clean_location_metadata_df(df):
+    list_of_replacements = [{'Rocky Mountains (PADD 4)': 'Rocky Mountain (PADD 4)'},
+                            {'Midwest (PADD2)': 'Midwest (PADD 2)'},
+                            ]
+
+    for replacement in list_of_replacements:
+        df[LOCATION] = df[LOCATION].replace(*replacement)
+
+
+if __name__ == '__main__':
+    # load metadata
+    pathfile = os.path.join(path, file_for_metadata)
+    metadata_df = pd.read_pickle(pathfile)
+
+    clean_location_metadata_df(metadata_df)
+
+    # load scrape result
+    pathfile = os.path.join(path, file_for_scrape)
+    scrape_df = pd.read_pickle(pathfile)
+    scrape_df = scrape_df[scrape_data_reduced_columns]
+
+    df = metadata_df.join(scrape_df)
+
+    pathfile = os.path.join(path, xlsx_for_enriched_metadata)
+    with pd.ExcelWriter(pathfile) as writer:
+        df.to_excel(writer, sheet_name='metadata')
+
+    print()

@@ -30,13 +30,16 @@ urls = [
     'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r50_w.htm',  # padd5
     'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm',  # us
 ]
+
+# dataframe columns
 scrape_columns = ['text', 'level', SOURCE_KEY, 'year_start', 'year_end']
+report_columns = scrape_columns + ['level_change', 'symbol_list', 'full_name']
+report_columns.remove(SOURCE_KEY)  # because its the index now
 
 
 def get_soups_for_urls(urls):
     soups = []
     for url in urls:
-        url = r'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_nus_w.htm'
         html = requests.get(url).content
         soup = BeautifulSoup(html, 'html.parser')
         soups.append(soup)
@@ -78,21 +81,21 @@ def get_soup_to_df(soup):
                [year_range[1] for year_range in year_ranges],  # year_end
                )
 
-    # return a dataframe
-    return pd.DataFrame(data=list(data), columns=scrape_columns)
+    # create and return a dataframe
+    df = pd.DataFrame(data=list(data), columns=scrape_columns)
+    df.set_index(SOURCE_KEY, drop=True, inplace=True)
+    return df
 
 
 def build_hierarchy_from_indent(df):
     # first order difference
     df['level_change'] = df['level'] - df['level'].shift(periods=1, axis='index', fill_value=0)
 
-    # initialise column and change type to accept list
-    df['hierarchy_text'] = None
-    df['hierarchy_text'] = df['hierarchy_text'].astype('object')
-    df['hierarchy_symbol'] = None
-    df['hierarchy_symbol'] = df['hierarchy_symbol'].astype('object')
-    text_list, symbol_list = [], []
+    # initialise column to capture full path as a list of symbols
+    df['symbol_list'] = None
+    df['symbol_list'] = df['symbol_list'].astype('object')
 
+    symbol_list = []
     for i, row in df.iterrows():
         # extend the list ie dont pop
         if row['level_change'] >= 1:
@@ -105,39 +108,47 @@ def build_hierarchy_from_indent(df):
         # pop the required number of times
         for _ in range(pop_count):
             try:
-                text_list.pop()
                 symbol_list.pop()
             except IndexError as err:
                 pass
 
-        # update the lists and the df
-        text_list.append(row['text'])
-        symbol_list.append(row[SOURCE_KEY])
-        df.at[i, 'hierarchy_text'] = text_list.copy()
-        df.at[i, 'hierarchy_symbol'] = symbol_list.copy()
-    df.set_index(SOURCE_KEY, drop=True, inplace=True)
+        # update the list and the df
+        symbol_list.append(i)
+        df.at[i, 'symbol_list'] = symbol_list.copy()
     return df
 
 
 def build_flat_hierarchy_from_list(df):
-    max_depth = df['hierarchy_symbol'].apply(len).max()
+    max_depth = df['symbol_list'].apply(len).max()
     hierarchy_df = pd.DataFrame(data=None, index=df.index, columns=range(max_depth))
     for i, row in df.iterrows():
-        padded_leaves = row['hierarchy_symbol'] + [''] * (max_depth - len(row['hierarchy_symbol']))
+        padded_leaves = row['symbol_list'] + [''] * (max_depth - len(row['symbol_list']))
         hierarchy_df.loc[i] = padded_leaves
     return hierarchy_df
 
 
-def build_report_df(hierarchy_df, metadata_df, flat_hierarchy_df, scrape_columns=scrape_columns):
+def build_hierarchy_name_from_list(df):
+    for i, row in df.iterrows():
+        # create a temporary df using the symbols in the symbol list
+        index = pd.Index(row['symbol_list'], name=SOURCE_KEY)
+        temp_df = pd.DataFrame(index=index)
+        # inner join and get the text as a list
+        texts = df.join(temp_df, how='inner')['text'].values
+        texts = list(texts)
+        # concatenate into a full name
+        df['full_name'] = (' | ').join(texts).copy()
+    return df
+
+
+def build_report_df(hierarchy_df, metadata_df, flat_hierarchy_df):
     # define columns
-    scrape_columns = scrape_columns + ['level_change']
-    scrape_columns.remove(SOURCE_KEY)  # because its the index now
-    meta_columns = metadata_reduced_columns
-    flat_hierarchy_columns = flat_hierarchy_df.columns
+    columns = report_columns \
+              + list(metadata_reduced_columns) \
+              + list(flat_hierarchy_df.columns)
 
     # join and return the new df
     report_df = hierarchy_df.join(metadata_df).join(flat_hierarchy_df)
-    return report_df[scrape_columns + list(meta_columns) + list(flat_hierarchy_columns)]
+    return report_df[columns]
 
 
 if __name__ == '__main__':
@@ -147,7 +158,6 @@ if __name__ == '__main__':
 
     # simple parser
     soups = get_soups_for_urls(urls)
-    # soups = [soups[-1]]
     dfs = []
     for soup in soups:
         dfs.append(get_soup_to_df(soup))
@@ -157,6 +167,9 @@ if __name__ == '__main__':
     for df in dfs:
         new_df = build_hierarchy_from_indent(df)
         hierarchy_df = pd.concat([hierarchy_df, new_df], axis='rows')
+
+    # add a column for the full name using the symbol list in each row
+    hierarchy_df = build_hierarchy_name_from_list(hierarchy_df)
 
     # prepare for upload by building a flat hierarchy version w integer column names
     flat_hierarchy_df = pd.DataFrame()
