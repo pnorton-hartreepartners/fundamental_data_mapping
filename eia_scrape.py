@@ -135,8 +135,9 @@ def build_hierarchy_name_from_list(df):
         # inner join and get the text as a list
         texts = df.join(temp_df, how='inner')['text'].values
         texts = list(texts)
-        # concatenate into a full name
-        df['full_name'] = (' | ').join(texts).copy()
+        # concatenate into a full name and update
+        full_name = (' | ').join(texts)
+        df.loc[i, 'full_name'] = full_name
     return df
 
 
