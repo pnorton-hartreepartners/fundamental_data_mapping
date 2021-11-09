@@ -3,8 +3,7 @@ functions for building and using metadata
 '''
 import os
 import pandas as pd
-from constants import path, file_for_metadata, SOURCE_KEY, DESCRIPTION, LOCATION, file_for_scrape, xlsx_for_enriched_metadata, \
-scrape_data_reduced_columns
+from constants import path, file_for_metadata, SOURCE_KEY, DESCRIPTION, LOCATION, xlsx_for_cleaned_metadata
 
 
 def get_all_metadata_for_symbol(metadata_df, source_key):
@@ -55,17 +54,10 @@ if __name__ == '__main__':
     pathfile = os.path.join(path, file_for_metadata)
     metadata_df = pd.read_pickle(pathfile)
 
+    clean_description_metadata_df(metadata_df)
     clean_location_metadata_df(metadata_df)
 
-    # load scrape result
-    pathfile = os.path.join(path, file_for_scrape)
-    scrape_df = pd.read_pickle(pathfile)
-    scrape_df = scrape_df[scrape_data_reduced_columns]
-
-    df = metadata_df.join(scrape_df)
-
-    pathfile = os.path.join(path, xlsx_for_enriched_metadata)
+    pathfile = os.path.join(path, xlsx_for_cleaned_metadata)
     with pd.ExcelWriter(pathfile) as writer:
-        df.to_excel(writer, sheet_name='metadata')
+        metadata_df.to_excel(writer, sheet_name='metadata')
 
-    print()

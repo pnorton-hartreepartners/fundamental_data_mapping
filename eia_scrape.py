@@ -152,7 +152,7 @@ def build_report_df(hierarchy_df, metadata_df, flat_hierarchy_df):
     return report_df[columns]
 
 
-if __name__ == '__main__':
+def build_all_scrape(file_for_metadata, file_for_scrape, xlsx_for_scrape_result):
     # get saved metadata
     pathfile = os.path.join(path, file_for_metadata)
     metadata_df = pd.read_pickle(pathfile)
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     # add a column for the full name using the symbol list in each row
     hierarchy_df = build_hierarchy_name_from_list(hierarchy_df)
 
-    # prepare for upload by building a flat hierarchy version w integer column names
+    # prepare for mosaic upload by building a flat hierarchy version w integer column names
     flat_hierarchy_df = pd.DataFrame()
     for df in dfs:
         new_df = build_flat_hierarchy_from_list(df)
@@ -189,3 +189,7 @@ if __name__ == '__main__':
     pathfile = os.path.join(path, xlsx_for_scrape_result)
     with pd.ExcelWriter(pathfile) as writer:
         report_df.to_excel(writer, sheet_name='scrape_result')
+
+
+if __name__ == '__main__':
+    print()
