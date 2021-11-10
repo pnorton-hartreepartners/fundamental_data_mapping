@@ -1,4 +1,5 @@
 import os
+
 os.environ['IGNITE_HOST_OVERWRITE'] = 'jdbc.dev.mosaic.hartreepartners.com'
 os.environ['TSDB_HOST'] = 'tsdb-dev.mosaic.hartreepartners.com'
 os.environ['CRATE_HOST'] = 'ttda.cratedb-dev-cluster.mosaic.hartreepartners.com:4200'
@@ -18,9 +19,9 @@ from eia_scrape import build_all_scrape
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--mode',
-                            help='SAVE or LOAD',
-                            choices=['save', 'load'],
-                            required=True)
+                        help='SAVE or LOAD',
+                        choices=['save', 'load'],
+                        required=True)
     return parser.parse_args()
 
 
