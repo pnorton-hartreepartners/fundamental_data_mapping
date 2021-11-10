@@ -20,7 +20,7 @@ import requests
 import pandas as pd
 import os
 from constants import path, file_for_scrape_result, xlsx_for_scrape_result, \
-    SOURCE_KEY
+    SOURCE_KEY, file_for_cleaned_metadata, TAB_DESCRIPTION, LOCATION
 
 urls = [
     'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r10_w.htm',  # padd1
@@ -171,7 +171,15 @@ def build_all_scrape():
     pathfile = os.path.join(path, file_for_scrape_result)
     report_df.to_pickle(pathfile)
 
-    # save as xls
+    # save as xls for human consumption; so need the table name and location
+    pathfile = os.path.join(path, file_for_cleaned_metadata)
+    metadata_df = pd.read_pickle(pathfile)
+
+    extra_columns = [TAB_DESCRIPTION, LOCATION]
+    report_df = report_df.join(metadata_df[extra_columns])
+    columns = list(hierarchy_df.columns) + extra_columns + list(flat_hierarchy_df.columns)
+    report_df = report_df[columns]
+
     pathfile = os.path.join(path, xlsx_for_scrape_result)
     with pd.ExcelWriter(pathfile) as writer:
         report_df.to_excel(writer, sheet_name='scrape_result')
