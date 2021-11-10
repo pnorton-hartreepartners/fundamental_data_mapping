@@ -10,8 +10,8 @@ import pandas as pd
 import datetime as dt
 from eia_hierarchy_definitions import hierarchy_dict_us_stocks
 from eia_metadata import get_single_metadata_dict_for_all_symbols
-from constants import path, file_for_mosaic_data, xlsx_for_timeseries_analysis, \
-    file_for_metadata, SOURCE_KEY, DESCRIPTION
+from constants import path, xlsx_for_timeseries_analysis, \
+    SOURCE_KEY, DESCRIPTION, file_for_cleaned_metadata, file_for_timeseries
 
 SUBTOTAL = 'subtotal'
 CALCULATED = 'calculated'
@@ -65,12 +65,15 @@ if __name__ == '__main__':
     source_key = 'WTTSTUS1'
 
     # load timeseries data
-    pathfile = os.path.join(path, file_for_mosaic_data)
+    pathfile = os.path.join(path, file_for_timeseries)
     timeseries_df = pd.read_pickle(pathfile)
 
     # load metadata
-    pathfile = os.path.join(path, file_for_metadata)
+    pathfile = os.path.join(path, file_for_cleaned_metadata)
     metadata_df = pd.read_pickle(pathfile)
+
+    # join it up
+    timeseries_df = timeseries_df.join(metadata_df)
 
     # =================================================================
     # do some analysis; compare the total with the sum of the parts

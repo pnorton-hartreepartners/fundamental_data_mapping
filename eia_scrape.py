@@ -19,8 +19,8 @@ from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import os
-from constants import path, file_for_scrape, file_for_metadata, xlsx_for_scrape_result, \
-    SOURCE_KEY, LOCATION, metadata_reduced_columns
+from constants import path, file_for_scrape_result, xlsx_for_scrape_result, \
+    SOURCE_KEY
 
 urls = [
     'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r10_w.htm',  # padd1
@@ -141,21 +141,7 @@ def build_hierarchy_name_from_list(df):
     return df
 
 
-def build_report_df(hierarchy_df, metadata_df, flat_hierarchy_df):
-    # define columns
-    columns = report_columns \
-              + list(metadata_reduced_columns) \
-              + list(flat_hierarchy_df.columns)
-
-    # join and return the new df
-    report_df = hierarchy_df.join(metadata_df).join(flat_hierarchy_df)
-    return report_df[columns]
-
-
-def build_all_scrape(file_for_metadata, file_for_scrape, xlsx_for_scrape_result):
-    # get saved metadata
-    pathfile = os.path.join(path, file_for_metadata)
-    metadata_df = pd.read_pickle(pathfile)
+def build_all_scrape():
 
     # simple parser
     soups = get_soups_for_urls(urls)
@@ -178,11 +164,11 @@ def build_all_scrape(file_for_metadata, file_for_scrape, xlsx_for_scrape_result)
         new_df = build_flat_hierarchy_from_list(df)
         flat_hierarchy_df = pd.concat([flat_hierarchy_df, new_df], axis='rows')
 
-    # join everything up
-    report_df = build_report_df(hierarchy_df, metadata_df, flat_hierarchy_df)
+    # join it up
+    report_df = hierarchy_df.join(flat_hierarchy_df)
 
     # save to file
-    pathfile = os.path.join(path, file_for_scrape)
+    pathfile = os.path.join(path, file_for_scrape_result)
     report_df.to_pickle(pathfile)
 
     # save as xls
@@ -192,4 +178,4 @@ def build_all_scrape(file_for_metadata, file_for_scrape, xlsx_for_scrape_result)
 
 
 if __name__ == '__main__':
-    print()
+    build_all_scrape()

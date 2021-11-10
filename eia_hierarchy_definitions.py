@@ -5,12 +5,20 @@ for consumption by timeseries analysis
 import pandas as pd
 import os
 import datetime as dt
-from constants import path, file_for_scrape, TAB_DESCRIPTION
+from constants import path, file_for_scrape_result, TAB_DESCRIPTION, xlsx_for_cleaned_metadata, \
+       file_for_cleaned_metadata, LOCATION
 
 # ======================================
-# import the datafile to a df
-pathfile = os.path.join(path, file_for_scrape)
+# import the scrape result
+pathfile = os.path.join(path, file_for_scrape_result)
 scrape_df = pd.read_pickle(pathfile)
+
+# import the metadata
+pathfile = os.path.join(path, file_for_cleaned_metadata)
+metadata_df = pd.read_pickle(pathfile)
+
+# join it up
+scrape_df = scrape_df.join(metadata_df)
 
 # ======================================
 # filter for headline stocks data ie level zero
@@ -21,7 +29,8 @@ current_year = dt.date.today().year
 # weird pandas feature == operator doesnt work here
 mask = scrape_df['level'].eq(0) \
        & scrape_df[TAB_DESCRIPTION].eq('Stocks') \
-       & scrape_df['year_end'].eq(current_year)
+       & scrape_df['year_end'].eq(current_year) \
+       & scrape_df[LOCATION].eq('U.S.')
 
 # the first symbol in the list is the total of everything; so make it the key
 list_of_symbols = list(scrape_df[mask].index)

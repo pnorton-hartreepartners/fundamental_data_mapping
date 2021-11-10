@@ -8,7 +8,7 @@ import os
 import pandas as pd
 from collections import namedtuple
 from constants import TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION, \
-    path, file_for_metadata, xlsx_for_mapping_result
+    path, file_for_raw_metadata, xlsx_for_mapping_result
 
 REMAINING_DESCRIPTION = 'remaining description'
 MAP_PRODUCT = 'map_product'
@@ -116,7 +116,7 @@ corrections_mapping = {
 
 if __name__ == '__main__':
     # load the metadata
-    file = os.path.join(path, file_for_metadata)
+    file = os.path.join(path, file_for_raw_metadata)
     metadata_df = pd.read_pickle(file)
 
     # standardise the label and the content

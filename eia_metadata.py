@@ -3,7 +3,8 @@ functions for building and using metadata
 '''
 import os
 import pandas as pd
-from constants import path, file_for_metadata, SOURCE_KEY, DESCRIPTION, LOCATION, xlsx_for_cleaned_metadata
+from constants import path, file_for_raw_metadata, SOURCE_KEY, DESCRIPTION, LOCATION, xlsx_for_cleaned_metadata, \
+    file_for_cleaned_metadata
 
 
 def get_all_metadata_for_symbol(metadata_df, source_key):
@@ -49,15 +50,24 @@ def clean_location_metadata_df(df):
         df[LOCATION] = df[LOCATION].replace(*replacement)
 
 
-if __name__ == '__main__':
-    # load metadata
-    pathfile = os.path.join(path, file_for_metadata)
+def build_clean_metadata():
+    # load the raw metadata
+    pathfile = os.path.join(path, file_for_raw_metadata)
     metadata_df = pd.read_pickle(pathfile)
 
+    # clean it
     clean_description_metadata_df(metadata_df)
     clean_location_metadata_df(metadata_df)
+
+    # save it
+    pathfile = os.path.join(path, file_for_cleaned_metadata)
+    metadata_df.to_pickle(pathfile)
 
     pathfile = os.path.join(path, xlsx_for_cleaned_metadata)
     with pd.ExcelWriter(pathfile) as writer:
         metadata_df.to_excel(writer, sheet_name='metadata')
+
+
+if __name__ == '__main__':
+    build_clean_metadata()
 

@@ -1,24 +1,30 @@
 import os
-
-from eia_scrape import build_all_scrape
-
 os.environ['IGNITE_HOST_OVERWRITE'] = 'jdbc.dev.mosaic.hartreepartners.com'
 os.environ['TSDB_HOST'] = 'tsdb-dev.mosaic.hartreepartners.com'
 os.environ['CRATE_HOST'] = 'ttda.cratedb-dev-cluster.mosaic.hartreepartners.com:4200'
 os.environ['MOSAIC_ENV'] = 'DEV'
 
 import pandas as pd
+import argparse
 from analyst_data_views.common.db_flattener import getFlatRawDF
 from constants import path, file_for_mosaic_data, \
-    file_for_metadata, SAVE, LOAD, csv_for_tableau_timeseries, xlsx_for_seasonality_timeseries, \
-    terse_timeseries_columns, file_for_scrape, xlsx_for_scrape_result
+    file_for_raw_metadata, SAVE, LOAD, csv_for_timeseries, xlsx_for_seasonality_timeseries, \
+    terse_timeseries_columns, file_for_timeseries
 from eia_seasonality_dates import build_calyear_weekly_seasonality
-from eia_metadata import get_metadata_df
+from eia_metadata import get_metadata_df, build_clean_metadata
+from eia_scrape import build_all_scrape
 
 
-if __name__ == '__main__':
-    data_mode = SAVE
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--mode',
+                            help='SAVE or LOAD',
+                            choices=['save', 'load'],
+                            required=True)
+    return parser.parse_args()
 
+
+def get_full_timeseries(data_mode):
     if data_mode == SAVE:
         # symbol, date, value format
         timeseries_df = getFlatRawDF(source='eia-weekly')
@@ -29,32 +35,20 @@ if __name__ == '__main__':
         timeseries_df = pd.read_pickle(pathfile)
     else:
         raise NotImplementedError
+    return timeseries_df
 
-    # =============================================================================
-    # create terse timeseries as csv for tableau
 
-    pathfile = os.path.join(path, csv_for_tableau_timeseries)
-    timeseries_df[terse_timeseries_columns].to_csv(pathfile, index=False)
-
-    # =============================================================================
-    # build metadata and save to file
-
+def build_basic_metadata(timeseries_df):
     exclude_columns = ['updated_at', 'date', 'value']
     columns = [c for c in timeseries_df.columns if c not in exclude_columns]
     metadata_df = get_metadata_df(timeseries_df, columns)
-
-    pathfile = os.path.join(path, file_for_metadata)
+    pathfile = os.path.join(path, file_for_raw_metadata)
     metadata_df.to_pickle(pathfile)
 
-    # =============================================================================
-    # run webscrape, build metadata and save to file
-    build_all_scrape(file_for_metadata, file_for_scrape, xlsx_for_scrape_result)
 
-    # =============================================================================
-    # build seasonality dates
-
+def build_seasonality_ts():
     # load terse timeseries data extracted from db
-    pathfile = os.path.join(path, csv_for_tableau_timeseries)
+    pathfile = os.path.join(path, csv_for_timeseries)
     timeseries_df = pd.read_csv(pathfile)
 
     # create a clean date index
@@ -69,3 +63,36 @@ if __name__ == '__main__':
     pathfile = os.path.join(path, xlsx_for_seasonality_timeseries)
     with pd.ExcelWriter(pathfile) as writer:
         seasonality_df.to_excel(writer, sheet_name='seasonality')
+
+
+if __name__ == '__main__':
+    '''
+    python main.py --mode load
+    '''
+    args = get_args()
+    timeseries_df = get_full_timeseries(args.mode)
+
+    # =============================================================================
+    # create terse timeseries ie sourcekey, date and value only
+    # save as csv for tableau... and pickle for everything else
+    pathfile = os.path.join(path, file_for_timeseries)
+    timeseries_df[terse_timeseries_columns].to_pickle(pathfile)
+
+    pathfile = os.path.join(path, csv_for_timeseries)
+    timeseries_df[terse_timeseries_columns].to_csv(pathfile, index=False)
+
+    # =============================================================================
+    # build metadata and save to file
+    build_basic_metadata(timeseries_df)
+
+    # =============================================================================
+    # clean names and locations
+    build_clean_metadata()
+
+    # =============================================================================
+    # run webscrape, build metadata and save to file
+    build_all_scrape()
+
+    # =============================================================================
+    # build seasonality dates
+    build_seasonality_ts()
