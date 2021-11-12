@@ -27,7 +27,6 @@ def get_args():
 
 def get_full_timeseries(data_mode):
     if data_mode == SAVE:
-        # symbol, date, value format
         timeseries_df = getFlatRawDF(source='eia-weekly')
         pathfile = os.path.join(path, file_for_mosaic_data)
         timeseries_df.to_pickle(pathfile)
