@@ -1,6 +1,9 @@
 '''
 functions for building and using metadata
+also we modify text to fix source data typos
+this is NOT part of the mosaic mapping exercise
 '''
+
 import os
 import pandas as pd
 from constants import path, file_for_raw_metadata, SOURCE_KEY, DESCRIPTION, LOCATION, xlsx_for_cleaned_metadata, \

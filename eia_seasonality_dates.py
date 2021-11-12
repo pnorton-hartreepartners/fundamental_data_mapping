@@ -1,4 +1,8 @@
+import os
+
 import pandas as pd
+
+from constants import path, csv_for_timeseries
 
 
 def build_calyear_weekly_seasonality(dates):
@@ -29,4 +33,15 @@ def build_calyear_weekly_seasonality(dates):
     return df
 
 
+if __name__ == '__main__':
+    # load terse timeseries data extracted from db
+    pathfile = os.path.join(path, csv_for_timeseries)
+    timeseries_df = pd.read_csv(pathfile)
+
+    # create a clean date index
+    dates_df = timeseries_df['date'].drop_duplicates()
+    dates_index = pd.to_datetime(dates_df.values)
+    dates_index.name = 'date'
+
+    build_calyear_weekly_seasonality(dates_index)
 

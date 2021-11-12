@@ -1,5 +1,7 @@
 import os
 
+from eia_trees import build_all_tree_analysis
+
 os.environ['IGNITE_HOST_OVERWRITE'] = 'jdbc.dev.mosaic.hartreepartners.com'
 os.environ['TSDB_HOST'] = 'tsdb-dev.mosaic.hartreepartners.com'
 os.environ['CRATE_HOST'] = 'ttda.cratedb-dev-cluster.mosaic.hartreepartners.com:4200'
@@ -96,3 +98,7 @@ if __name__ == '__main__':
     # =============================================================================
     # build seasonality dates
     build_seasonality_ts()
+
+    # =============================================================================
+    # identify leaf nodes
+    build_all_tree_analysis()
