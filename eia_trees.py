@@ -5,7 +5,7 @@ import networkx as nx
 import datetime as dt
 from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, file_for_scrape_result, \
     file_for_cleaned_metadata, xlsx_scrape_w_leaf_nodes, file_for_scrape_w_leaf_nodes
-from eia_hierarchy_definitions import us_stocks_remove_symbols
+from eia_hierarchy_definitions import manually_remove_symbols
 
 
 def build_graph_per_row_of_df(df):
@@ -50,11 +50,11 @@ def build_all_tree_analysis():
     # we dont want expired symbols
     current_year = dt.date.today().year
 
-    # select US stocks
-    mask = scrape_df[TAB_DESCRIPTION].eq('Stocks') \
-           & scrape_df['year_end'].eq(current_year) \
-           & scrape_df[LOCATION].eq('U.S.')
-    df = scrape_df[mask].copy(deep=True)
+    # # select US stocks
+    # mask = scrape_df[TAB_DESCRIPTION].eq('Stocks') \
+    #        & scrape_df['year_end'].eq(current_year) \
+    #        & scrape_df[LOCATION].eq('U.S.')
+    # df = scrape_df[mask].copy(deep=True)
 
     # ======================================
     # and now the graph analysis
@@ -90,12 +90,21 @@ def build_all_tree_analysis():
         tree_df.at[i, 'graph'] = H
         I = H.copy()
 
-        # manual override of hierarchy
-        for source_key in us_stocks_remove_symbols:
+        def _remove_node(I, source_key):
             try:
                 I.remove_node(source_key)
             except nx.exception.NetworkXError as e:
                 pass
+
+        # manual override of hierarchy
+        for source_key in manually_remove_symbols:
+            _remove_node(I, source_key)
+
+        # remove nodes that have expired
+        mask = df['year_end'] != current_year
+        for source_key in df.index[mask]:
+            _remove_node(I, source_key)
+
         tree_df.at[i, 'cleaned_graph'] = I
 
         # leaf nodes only have one neighbour; neighbours are reported from adjacency dict

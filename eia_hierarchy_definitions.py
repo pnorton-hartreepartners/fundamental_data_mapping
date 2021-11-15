@@ -42,7 +42,7 @@ list_of_symbols.remove('WTESTUS1')
 
 hierarchy_dict_us_stocks = {key: list_of_symbols}
 
-us_stocks_remove_symbols = [
+manually_remove_symbols = [
        # Total Crude Oil and Petroleum Products
        'WTTSTUS1',
        'WTESTUS1',
