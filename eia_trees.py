@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import datetime as dt
 from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, file_for_scrape_result, \
-    file_for_cleaned_metadata, xlsx_for_leaf_nodes
+    file_for_cleaned_metadata, xlsx_scrape_w_leaf_nodes, file_for_scrape_w_leaf_nodes
 from eia_hierarchy_definitions import us_stocks_remove_symbols
 
 
@@ -13,19 +13,18 @@ def build_graph_per_row_of_df(df):
     df['graph'] = None
     df['graph'] = df['graph'].astype('object')
     for i, row in df.iterrows():
-        # create empty tree
-        G = nx.Graph()
         # get the list of nodes
         symbol_list = row['symbol_list']
         # define edges as tuple-pairs of nodes being a (start, end) format
         edges = [(a, b) for a, b in zip(['root'] + symbol_list[:-1], symbol_list)]
-        # add edges to the tree
+        # create an empty graph and add edges
+        G = nx.Graph()
         G.add_edges_from(edges)
         # add graph to df
         df.at[i, 'graph'] = G
 
 
-def build_whole_graph_by_adding_small_ones(df):
+def build_graph_per_report_location(df):
     H = nx.Graph()
     for G in df['graph'].values:
         H.update(G)
@@ -46,7 +45,7 @@ def build_all_tree_analysis():
     scrape_df = scrape_df.join(metadata_df)
 
     # ======================================
-    # filter for headline stocks data ie level zero
+    # filter for US stocks data; we need to extend this
 
     # we dont want expired symbols
     current_year = dt.date.today().year
@@ -57,31 +56,77 @@ def build_all_tree_analysis():
            & scrape_df[LOCATION].eq('U.S.')
     df = scrape_df[mask].copy(deep=True)
 
-    # define a graph for each symbol_list and save to df
-    build_graph_per_row_of_df(df)
+    # ======================================
+    # and now the graph analysis
 
-    # use each tree from the df to build the full tree
-    H = build_whole_graph_by_adding_small_ones(df)
+    # this new df contains a full tree per table and location
+    columns = [TAB_DESCRIPTION, LOCATION]
+    tree_df = scrape_df[columns].drop_duplicates(ignore_index=True)
+    tree_df.set_index(columns, drop=True, inplace=True)
 
-    # manual override of web based hierarchy
-    for source_key in us_stocks_remove_symbols:
-        H.remove_node(source_key)
+    # how tiresome
+    tree_df['graph'] = None
+    tree_df['graph'] = tree_df['graph'].astype('object')
+    tree_df['cleaned_graph'] = None
+    tree_df['cleaned_graph'] = tree_df['cleaned_graph'].astype('object')
+    tree_df['leaf_nodes'] = None
+    tree_df['leaf_nodes'] = tree_df['leaf_nodes'].astype('object')
 
-    # leaf nodes only have one neighbour; neighbours are reported from adjacency dict
-    leaf_nodes = [n for n in H.nodes if len(H.adj[n]) == 1]
+    scrape_df['leaf_node'] = False
 
-    # save to a df
-    index = pd.Index(leaf_nodes, name=SOURCE_KEY)
-    leaf_df = pd.DataFrame(index=index)
+    for i, row in tree_df.iterrows():
+        # filter the source for the table/location
+        mask = scrape_df[columns] == i
+        mask = mask.all(axis='columns')
+        df = scrape_df.loc[mask]
+
+        # add the line graph
+        build_graph_per_row_of_df(df)
+
+        # use each line graph from the df to build the full tree
+        H = build_graph_per_report_location(df)
+
+        # define a graph for each symbol_list and save to df
+        tree_df.at[i, 'graph'] = H
+        I = H.copy()
+
+        # manual override of hierarchy
+        for source_key in us_stocks_remove_symbols:
+            try:
+                I.remove_node(source_key)
+            except nx.exception.NetworkXError as e:
+                pass
+        tree_df.at[i, 'cleaned_graph'] = I
+
+        # leaf nodes only have one neighbour; neighbours are reported from adjacency dict
+        leaf_nodes = [n for n in I.nodes if len(I.adj[n]) == 1]
+        tree_df.at[i, 'leaf_nodes'] = leaf_nodes
+
+        # enrich the original scrape df with a label to show the boolean state
+        mask = scrape_df.index.isin(leaf_nodes)
+        scrape_df.loc[mask, 'leaf_node'] = True
+
+    # ======================================
+    # save the data
+
+    # save to a pickle just in case
+    pathfile = os.path.join(path, file_for_scrape_w_leaf_nodes)
+    tree_df.to_pickle(pathfile)
 
     # and then to xls so we can use in tableau
-    pathfile = os.path.join(path, xlsx_for_leaf_nodes)
+    pathfile = os.path.join(path, xlsx_scrape_w_leaf_nodes)
     with pd.ExcelWriter(pathfile) as writer:
-        leaf_df.to_excel(writer, sheet_name='leaf_nodes')
+        scrape_df.to_excel(writer, sheet_name='leaf_nodes')
 
-    # view the tree
+    # ======================================
+    # and view the US stocks tree as a chart
+
+    tree = ('Stocks', 'U.S.')
+    G = tree_df.loc[tree, 'cleaned_graph']
+    leaf_nodes = tree_df.loc[tree, 'leaf_nodes']
+    node_color = ['red' if node in leaf_nodes else 'gray' for node in G.nodes]
     ax = plt.subplot(111)
-    nx.draw(H, with_labels=True)
+    nx.draw(G, node_color=node_color, with_labels=True)
     plt.show()
 
 
