@@ -1,17 +1,15 @@
 '''
-functions to select data based on dict of hierarchy of symbols
- - test that the sum of the children equates to the parent
- - generate a pivotted df to chart the children and parent
+standalone analysis checking how sum(components)=total
 output is a pivotted df in an xls for human consumption
+probably not required any more
 '''
 
 import os
 import pandas as pd
 import datetime as dt
-from eia_hierarchy_definitions import hierarchy_dict_us_stocks
 from eia_metadata import get_single_metadata_dict_for_all_symbols
 from constants import path, xlsx_for_timeseries_analysis, \
-    SOURCE_KEY, DESCRIPTION, file_for_cleaned_metadata, file_for_timeseries
+    SOURCE_KEY, DESCRIPTION, file_for_cleaned_metadata, file_for_timeseries, file_for_scrape_w_leaf_nodes
 
 SUBTOTAL = 'subtotal'
 CALCULATED = 'calculated'
@@ -62,7 +60,8 @@ def get_subtotal_df(df, source_key):
 
 
 if __name__ == '__main__':
-    source_key = 'WTTSTUS1'
+    # choose the table/location we will look at
+    tree = ('Stocks', 'U.S.')
 
     # load timeseries data
     pathfile = os.path.join(path, file_for_timeseries)
@@ -75,18 +74,25 @@ if __name__ == '__main__':
     # join it up
     timeseries_df = timeseries_df.join(metadata_df)
 
+    # get the tree per table/location
+    pathfile = os.path.join(path, file_for_scrape_w_leaf_nodes)
+    tree_df = pd.read_pickle(pathfile)
+
     # =================================================================
     # do some analysis; compare the total with the sum of the parts
 
-    # select which hierarchy mapping to look at and build comparison to calc diffs
-    selection = hierarchy_dict_us_stocks[source_key]
-    comparison_df = build_comparison(timeseries_df, source_key=source_key, source_keys=selection)
+    # select which hierarchy mapping to look at
+    G = tree_df.loc[tree, 'cleaned_graph']
+    leaf_nodes = tree_df.loc[tree, 'leaf_nodes']
+
+    # build comparison to calc diffs
+    comparison_df = build_comparison(timeseries_df, source_key=source_key, source_keys=leaf_nodes)
 
     # =================================================================
     # do some more analysis; report the total and the parts as a pivot
 
     # collect timeseries for all the component symbols and pivot
-    df_norm = get_components_df(timeseries_df, selection)
+    df_norm = get_components_df(timeseries_df, leaf_nodes)
     df_norm.set_index(DATE, drop=True, inplace=True)
     df_norm = df_norm[[SOURCE_KEY, VALUE]]
     df_pivot = get_components_pivot_df(df_norm)

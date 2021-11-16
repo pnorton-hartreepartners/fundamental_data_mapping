@@ -1,6 +1,6 @@
 '''
-this script contains the mapping data
-and steps through the mapping process
+this script uses the raw metadata derived from mosaic tsdb
+and generates mosaic mappings for upload
 output is an xls for human consumption
 '''
 

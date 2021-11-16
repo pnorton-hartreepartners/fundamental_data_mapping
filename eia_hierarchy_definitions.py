@@ -1,6 +1,5 @@
 '''
-generates a hierarchy as a dictionary
-for consumption by timeseries analysis
+edits to programmatically derived trees
 '''
 manually_remove_symbols = [
        # ===========================

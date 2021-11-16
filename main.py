@@ -1,7 +1,5 @@
 import os
 
-from eia_trees import build_all_tree_analysis
-
 os.environ['IGNITE_HOST_OVERWRITE'] = 'jdbc.dev.mosaic.hartreepartners.com'
 os.environ['TSDB_HOST'] = 'tsdb-dev.mosaic.hartreepartners.com'
 os.environ['CRATE_HOST'] = 'ttda.cratedb-dev-cluster.mosaic.hartreepartners.com:4200'
@@ -16,6 +14,7 @@ from constants import path, file_for_mosaic_data, \
 from eia_seasonality_dates import build_calyear_weekly_seasonality
 from eia_metadata import get_metadata_df, build_clean_metadata
 from eia_scrape import build_all_scrape
+from eia_trees import build_all_tree_analysis
 
 
 def get_args():
@@ -72,10 +71,11 @@ if __name__ == '__main__':
     python main.py --mode load
     '''
     args = get_args()
-    timeseries_df = get_full_timeseries(args.mode)
 
     # =============================================================================
     # create terse timeseries ie sourcekey, date and value only
+    timeseries_df = get_full_timeseries(args.mode)
+
     # save as csv for tableau... and pickle for everything else
     pathfile = os.path.join(path, file_for_timeseries)
     timeseries_df[terse_timeseries_columns].to_pickle(pathfile)
