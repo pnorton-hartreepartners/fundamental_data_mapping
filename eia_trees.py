@@ -3,15 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
 import datetime as dt
-from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, file_for_scrape_result, \
+from constants import path, TAB_DESCRIPTION, LOCATION, file_for_scrape_result, \
     file_for_cleaned_metadata, xlsx_scrape_w_leaf_nodes, file_for_scrape_w_leaf_nodes
 from eia_hierarchy_definitions import manually_remove_symbols
 
 
 def build_graph_per_row_of_df(df):
-    # define a graph for each symbol_list and save to df
-    df['graph'] = None
-    df['graph'] = df['graph'].astype('object')
     for i, row in df.iterrows():
         # get the list of nodes
         symbol_list = row['symbol_list']
@@ -36,33 +33,25 @@ def build_all_tree_analysis():
     # import the scrape result
     pathfile = os.path.join(path, file_for_scrape_result)
     scrape_df = pd.read_pickle(pathfile)
+    scrape_columns = scrape_df.columns
 
     # import the metadata
     pathfile = os.path.join(path, file_for_cleaned_metadata)
     metadata_df = pd.read_pickle(pathfile)
 
-    # join it up
-    scrape_df = scrape_df.join(metadata_df)
-
     # ======================================
-    # filter for US stocks data; we need to extend this
-
     # we dont want expired symbols
     current_year = dt.date.today().year
 
-    # # select US stocks
-    # mask = scrape_df[TAB_DESCRIPTION].eq('Stocks') \
-    #        & scrape_df['year_end'].eq(current_year) \
-    #        & scrape_df[LOCATION].eq('U.S.')
-    # df = scrape_df[mask].copy(deep=True)
+    # need these columns from the metadata to group the trees
+    enrich_columns = [TAB_DESCRIPTION, LOCATION]
 
     # ======================================
     # and now the graph analysis
 
-    # this new df contains a full tree per table and location
-    columns = [TAB_DESCRIPTION, LOCATION]
-    tree_df = scrape_df[columns].drop_duplicates(ignore_index=True)
-    tree_df.set_index(columns, drop=True, inplace=True)
+    # this new df will hold a full tree per table/location
+    tree_df = metadata_df[enrich_columns].drop_duplicates(ignore_index=True).copy(deep=True)
+    tree_df.set_index(enrich_columns, drop=True, inplace=True)
 
     # how tiresome
     tree_df['graph'] = None
@@ -72,11 +61,17 @@ def build_all_tree_analysis():
     tree_df['leaf_nodes'] = None
     tree_df['leaf_nodes'] = tree_df['leaf_nodes'].astype('object')
 
-    scrape_df['leaf_node'] = False
+    scrape_df['graph'] = None
+    scrape_df['graph'] = scrape_df['graph'].astype('object')
+
+    # enrich the scrape data with table/location columns from the metadata
+    scrape_df = scrape_df.join(metadata_df[enrich_columns])
+    # were going to populate this new column
+    scrape_df.insert(2, 'leaf_node', False)
 
     for i, row in tree_df.iterrows():
         # filter the source for the table/location
-        mask = scrape_df[columns] == i
+        mask = scrape_df[enrich_columns] == i
         mask = mask.all(axis='columns')
         df = scrape_df.loc[mask]
 
@@ -85,9 +80,9 @@ def build_all_tree_analysis():
 
         # use each line graph from the df to build the full tree
         H = build_graph_per_report_location(df)
-
-        # define a graph for each symbol_list and save to df
         tree_df.at[i, 'graph'] = H
+
+        # and now the cleaned graph
         I = H.copy()
 
         def _remove_node(I, source_key):
@@ -109,9 +104,11 @@ def build_all_tree_analysis():
 
         # leaf nodes only have one neighbour; neighbours are reported from adjacency dict
         leaf_nodes = [n for n in I.nodes if len(I.adj[n]) == 1]
+
+        # enrich the tree df as a list per row
         tree_df.at[i, 'leaf_nodes'] = leaf_nodes
 
-        # enrich the original scrape df with a label to show the boolean state
+        # enrich the scrape df with a boolean label per row
         mask = scrape_df.index.isin(leaf_nodes)
         scrape_df.loc[mask, 'leaf_node'] = True
 
@@ -122,10 +119,13 @@ def build_all_tree_analysis():
     pathfile = os.path.join(path, file_for_scrape_w_leaf_nodes)
     tree_df.to_pickle(pathfile)
 
-    # and then to xls so we can use in tableau
+    # retain the order and exclude enrichment
+    columns = [c for c in scrape_df.columns if c in list(scrape_columns) + ['leaf_node']]
+
+    # and save to xls so we can use in tableau
     pathfile = os.path.join(path, xlsx_scrape_w_leaf_nodes)
     with pd.ExcelWriter(pathfile) as writer:
-        scrape_df.to_excel(writer, sheet_name='leaf_nodes')
+        scrape_df[columns].to_excel(writer, sheet_name='scrape_result')
 
     # ======================================
     # and view the US stocks tree as a chart
