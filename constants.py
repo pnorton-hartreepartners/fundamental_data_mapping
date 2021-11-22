@@ -26,6 +26,7 @@ UNIT = 'Unit'
 DESCRIPTION = 'Description'
 LOAD = 'load'
 SAVE = 'save'
+REFRESH = 'refresh'
 
 metadata_reduced_columns = [DESCRIPTION, TAB_DESCRIPTION, LOCATION, UNIT]
 terse_timeseries_columns = ['date', SOURCE_KEY, 'value']

@@ -21,6 +21,7 @@ import pandas as pd
 import os
 from constants import path, file_for_scrape_result, xlsx_for_scrape_result, \
     SOURCE_KEY, file_for_cleaned_metadata, TAB_DESCRIPTION, LOCATION
+from eia_metadata import get_single_metadata_dict_for_all_symbols
 
 urls = [
     'https://www.eia.gov/dnav/pet/pet_sum_sndw_dcus_r10_w.htm',  # padd1
@@ -118,11 +119,16 @@ def build_hierarchy_from_indent(df):
     return df
 
 
-def build_flat_hierarchy_from_list(df):
+def build_flat_hierarchy_from_list(df, label=None):
+    # default is to build hierarchy from symbols
+    mapper = dict(zip(df.index, df[label].values)) if label else None
     max_depth = df['symbol_list'].apply(len).max()
     hierarchy_df = pd.DataFrame(data=None, index=df.index, columns=range(max_depth))
     for i, row in df.iterrows():
-        padded_leaves = row['symbol_list'] + [''] * (max_depth - len(row['symbol_list']))
+        mosaic_list = row['symbol_list']
+        if mapper:
+            mosaic_list = list(map(lambda x: mapper[x], mosaic_list))
+        padded_leaves = mosaic_list + [''] * (max_depth - len(mosaic_list))
         hierarchy_df.loc[i] = padded_leaves
     return hierarchy_df
 
@@ -142,6 +148,8 @@ def build_hierarchy_name_from_list(df):
 
 
 def build_all_scrape():
+    # for the flattened hierarchy
+    padding_label = 'text'
 
     # simple parser
     soups = get_soups_for_urls(urls)
@@ -161,7 +169,7 @@ def build_all_scrape():
     # prepare for mosaic upload by building a flat hierarchy version w integer column names
     flat_hierarchy_df = pd.DataFrame()
     for df in dfs:
-        new_df = build_flat_hierarchy_from_list(df)
+        new_df = build_flat_hierarchy_from_list(df, label=padding_label)
         flat_hierarchy_df = pd.concat([flat_hierarchy_df, new_df], axis='rows')
 
     # join it up
@@ -171,7 +179,7 @@ def build_all_scrape():
     pathfile = os.path.join(path, file_for_scrape_result)
     report_df.to_pickle(pathfile)
 
-    # save as xls for human consumption; so need the table name and location
+    # we need to enrich scrape data with table/location for human consumption of xls
     pathfile = os.path.join(path, file_for_cleaned_metadata)
     metadata_df = pd.read_pickle(pathfile)
 

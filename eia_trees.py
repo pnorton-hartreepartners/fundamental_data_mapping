@@ -89,7 +89,7 @@ def build_all_tree_analysis():
             try:
                 I.remove_node(source_key)
             except nx.exception.NetworkXError as e:
-                pass
+                print(source_key, e)
 
         # manual override of hierarchy
         for source_key in manually_remove_symbols:
@@ -118,6 +118,9 @@ def build_all_tree_analysis():
     # save to a pickle just in case
     pathfile = os.path.join(path, file_for_scrape_w_leaf_nodes)
     tree_df.to_pickle(pathfile)
+
+    # save to csv for upload to mosaic
+    pass
 
     # retain the order and exclude enrichment
     columns = [c for c in scrape_df.columns if c in list(scrape_columns) + ['leaf_node']]

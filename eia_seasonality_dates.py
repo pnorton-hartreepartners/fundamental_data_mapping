@@ -2,7 +2,7 @@ import os
 
 import pandas as pd
 
-from constants import path, csv_for_timeseries
+from constants import path, csv_for_timeseries, xlsx_for_seasonality_timeseries
 
 
 def build_calyear_weekly_seasonality(dates):
@@ -10,15 +10,19 @@ def build_calyear_weekly_seasonality(dates):
     # dictionary of year and max date; except current year ends early obviously
     end_of_years = {y: years[y].max() for y in years.keys()}
 
-    def end_of_year(last_date):
+    def incremental_dates_for_year(last_date):
         # extend with lots of weeks
         incremental_dates = pd.date_range(last_date, freq="W", periods=53)
-        # return the maximum week date in this year
-        return incremental_dates[incremental_dates.year == last_date.year].max()
+        # trim to the current year
+        return incremental_dates[incremental_dates.year == last_date.year]
 
     # get max date for current year and update dict
     this_year = dates.max().year
-    end_of_years[this_year] = end_of_year(dates.max())
+    incremental_dates = incremental_dates_for_year(dates.max())
+    end_of_years[this_year] = incremental_dates.max()
+
+    # extend this year so we don't have to run script every week
+    dates = dates.union(incremental_dates)
 
     df = pd.DataFrame(index=dates)
     for i, row in df.iterrows():
@@ -33,7 +37,7 @@ def build_calyear_weekly_seasonality(dates):
     return df
 
 
-if __name__ == '__main__':
+def build_seasonality_ts():
     # load terse timeseries data extracted from db
     pathfile = os.path.join(path, csv_for_timeseries)
     timeseries_df = pd.read_csv(pathfile)
@@ -43,5 +47,17 @@ if __name__ == '__main__':
     dates_index = pd.to_datetime(dates_df.values)
     dates_index.name = 'date'
 
-    build_calyear_weekly_seasonality(dates_index)
+    # calculate a time to expiry
+    seasonality_df = build_calyear_weekly_seasonality(dates_index)
+
+    # save as xls
+    pathfile = os.path.join(path, xlsx_for_seasonality_timeseries)
+    with pd.ExcelWriter(pathfile) as writer:
+        seasonality_df.to_excel(writer, sheet_name='seasonality')
+
+
+if __name__ == '__main__':
+    build_seasonality_ts()
+
+
 

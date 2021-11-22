@@ -59,7 +59,7 @@ def build_clean_metadata():
     metadata_df = pd.read_pickle(pathfile)
 
     # clean it
-    clean_description_metadata_df(metadata_df)
+    # clean_description_metadata_df(metadata_df)
     clean_location_metadata_df(metadata_df)
 
     # save it

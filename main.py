@@ -9,9 +9,9 @@ import pandas as pd
 import argparse
 from analyst_data_views.common.db_flattener import getFlatRawDF
 from constants import path, file_for_mosaic_data, \
-    file_for_raw_metadata, SAVE, LOAD, csv_for_timeseries, xlsx_for_seasonality_timeseries, \
+    file_for_raw_metadata, SAVE, LOAD, REFRESH, csv_for_timeseries, \
     terse_timeseries_columns, file_for_timeseries
-from eia_seasonality_dates import build_calyear_weekly_seasonality
+from eia_seasonality_dates import build_seasonality_ts
 from eia_metadata import get_metadata_df, build_clean_metadata
 from eia_scrape import build_all_scrape
 from eia_trees import build_all_tree_analysis
@@ -20,14 +20,14 @@ from eia_trees import build_all_tree_analysis
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--mode',
-                        help='SAVE or LOAD',
-                        choices=['save', 'load'],
+                        help='save, load or refresh',
+                        choices=[SAVE, LOAD, REFRESH],
                         required=True)
     return parser.parse_args()
 
 
 def get_full_timeseries(data_mode):
-    if data_mode == SAVE:
+    if data_mode in [SAVE, REFRESH]:
         timeseries_df = getFlatRawDF(source='eia-weekly')
         pathfile = os.path.join(path, file_for_mosaic_data)
         timeseries_df.to_pickle(pathfile)
@@ -47,28 +47,12 @@ def build_basic_metadata(timeseries_df):
     metadata_df.to_pickle(pathfile)
 
 
-def build_seasonality_ts():
-    # load terse timeseries data extracted from db
-    pathfile = os.path.join(path, csv_for_timeseries)
-    timeseries_df = pd.read_csv(pathfile)
-
-    # create a clean date index
-    dates_df = timeseries_df['date'].drop_duplicates()
-    dates_index = pd.to_datetime(dates_df.values)
-    dates_index.name = 'date'
-
-    # calculate a time to expiry
-    seasonality_df = build_calyear_weekly_seasonality(dates_index)
-
-    # save as xls
-    pathfile = os.path.join(path, xlsx_for_seasonality_timeseries)
-    with pd.ExcelWriter(pathfile) as writer:
-        seasonality_df.to_excel(writer, sheet_name='seasonality')
-
-
 if __name__ == '__main__':
     '''
     python main.py --mode load
+    # refresh means... just refresh the timeseries when new data is published
+    # load means... get the timeseries from the saved pickle
+    # save means... build and save everything
     '''
     args = get_args()
 
@@ -83,22 +67,18 @@ if __name__ == '__main__':
     pathfile = os.path.join(path, csv_for_timeseries)
     timeseries_df[terse_timeseries_columns].to_csv(pathfile, index=False)
 
-    # =============================================================================
-    # build metadata and save to file
-    build_basic_metadata(timeseries_df)
+    if args.mode == SAVE:
+        # build metadata and save to file
+        build_basic_metadata(timeseries_df)
 
-    # =============================================================================
-    # clean names and locations
-    build_clean_metadata()
+        # clean names and locations
+        build_clean_metadata()
 
-    # =============================================================================
-    # run webscrape, build metadata and save to file
-    build_all_scrape()
+        # run webscrape, build metadata and save to file
+        build_all_scrape()
 
-    # =============================================================================
-    # build seasonality dates
-    build_seasonality_ts()
+        # build seasonality dates
+        build_seasonality_ts()
 
-    # =============================================================================
-    # identify leaf nodes
-    build_all_tree_analysis()
+        # identify leaf nodes
+        build_all_tree_analysis()
