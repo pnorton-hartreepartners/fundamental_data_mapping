@@ -5,7 +5,7 @@ import networkx as nx
 import datetime as dt
 from constants import path, TAB_DESCRIPTION, LOCATION, file_for_scrape_result, \
     file_for_cleaned_metadata, xlsx_scrape_w_leaf_nodes, file_for_scrape_w_leaf_nodes
-from eia_hierarchy_definitions import manually_remove_symbols
+from eia_hierarchy_definitions import manually_remove_symbols, manually_remove_texts
 
 
 def build_graph_per_row_of_df(df):
@@ -63,6 +63,8 @@ def build_all_tree_analysis():
 
     scrape_df['graph'] = None
     scrape_df['graph'] = scrape_df['graph'].astype('object')
+    scrape_df['modified_symbol_list'] = None
+    scrape_df['modified_symbol_list'] = scrape_df['modified_symbol_list'].astype('object')
 
     # enrich the scrape data with table/location columns from the metadata
     scrape_df = scrape_df.join(metadata_df[enrich_columns])

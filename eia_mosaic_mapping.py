@@ -8,7 +8,7 @@ import os
 import pandas as pd
 from collections import namedtuple
 from constants import TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION, \
-    path, file_for_raw_metadata, xlsx_for_mapping_result
+    path, file_for_raw_metadata, csv_for_hierarchy_result
 
 REMAINING_DESCRIPTION = 'remaining description'
 MAP_PRODUCT = 'map_product'
@@ -166,6 +166,6 @@ if __name__ == '__main__':
     report_df = analysis_df[columns]
 
     # save as xls
-    pathfile = os.path.join(path, xlsx_for_mapping_result)
+    pathfile = os.path.join(path, csv_for_hierarchy_result)
     with pd.ExcelWriter(pathfile) as writer:
         report_df.to_excel(writer, sheet_name='mapping_result')

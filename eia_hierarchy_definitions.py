@@ -1,6 +1,7 @@
 '''
 edits to programmatically derived trees
 '''
+
 manually_remove_symbols = [
        # ===========================
        # US stocks
@@ -26,3 +27,4 @@ manually_remove_symbols = [
        'W_EPL0XP_IM0_NUS-Z00_MBBLD',  # ngpl/lrg
 ]
 
+manually_remove_texts = ['Total Products']
