@@ -4,14 +4,14 @@ import pandas as pd
 from constants import path, csv_for_hierarchy_result, xlsx_for_mapping_result, SOURCE_KEY, numbers_as_words, \
     file_for_scrape_result, xlsx_for_mapping_errors
 
-leaf = 'leaf'
-branch = 'branch'
+LEAF = 'leaf'
+BRANCH = 'branch'
 
 
 def get_mapping_df(df):
     # build a df with both leaf and full branch syntax
     index = pd.Index(data=[], name=SOURCE_KEY)
-    mapping_df = pd.DataFrame(data=None, index=index, columns=[leaf, branch])
+    mapping_df = pd.DataFrame(data=None, index=index, columns=[LEAF, BRANCH])
     for i, row in df.iterrows():
         # replace empty string and drop; drop method fails if index is missing
         row.replace(to_replace='', value=np.NaN, inplace=True)
@@ -19,10 +19,10 @@ def get_mapping_df(df):
         # find the rightmost column index and value for leaf
         max_column = row.index[-1]
         max_value = row.loc[max_column]
-        mapping_df.at[i, leaf] = f'{max_column}:{max_value}'
+        mapping_df.at[i, LEAF] = f'{max_column}:{max_value}'
         # create branch syntax using all nodes
         branch_str = '@'.join(row.values)
-        mapping_df.at[i, branch] = f'{max_column}:{branch_str}'
+        mapping_df.at[i, BRANCH] = f'{max_column}:{branch_str}'
     return mapping_df
 
 
@@ -56,8 +56,8 @@ def build_all_mapping():
 
     # assume errors are symbols that require the branch syntax
     mask = naive_mapping_df.index.isin(error_keys)
-    branch_df = naive_mapping_df.loc[mask, branch]
-    leaf_df = naive_mapping_df.loc[~mask, leaf]
+    branch_df = naive_mapping_df.loc[mask, BRANCH]
+    leaf_df = naive_mapping_df.loc[~mask, LEAF]
     final_mapping_df = pd.concat([leaf_df, branch_df], axis='index')
 
     # ====================
