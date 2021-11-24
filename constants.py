@@ -31,6 +31,7 @@ SAVE = 'save'
 REFRESH = 'refresh'
 
 metadata_reduced_columns = [DESCRIPTION, TAB_DESCRIPTION, LOCATION, UNIT]
+metadata_enrich_columns = [TAB_DESCRIPTION, LOCATION]
 terse_timeseries_columns = ['date', SOURCE_KEY, 'value']
 
 numbers_as_words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']

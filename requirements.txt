@@ -5,6 +5,7 @@ conda install -c anaconda openpyxl
 conda install -c anaconda requests
 conda install -c anaconda networkx
 conda install -c conda-forge matplotlib
+conda install -c anaconda xlrd
 pip install analyst_data_views
 
 '''

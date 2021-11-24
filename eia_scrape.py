@@ -18,11 +18,9 @@ and as an xls for review by humans
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
-import numpy as np
 import os
 from constants import path, file_for_scrape_result, xlsx_for_scrape_result, \
-    SOURCE_KEY, file_for_cleaned_metadata, TAB_DESCRIPTION, LOCATION, csv_for_hierarchy_result, xlsx_for_mapping_result, \
-    xlsx_for_mapping_errors, numbers_as_words
+    SOURCE_KEY, file_for_cleaned_metadata, numbers_as_words, metadata_enrich_columns
 from eia_hierarchy_definitions import manually_remove_texts
 
 urls = [
@@ -124,11 +122,14 @@ def build_hierarchy_from_indent(df):
     return df
 
 
-def build_flat_hierarchy_from_list(df, remove_texts=True):
+def build_flat_hierarchy_from_list(df, remove_texts=False):
+    # map source_key to required field
     label = 'text'
     mapper = dict(zip(df.index, df[label].values))
+    # define new columns
     max_depth = df['symbol_list'].apply(len).max()
     columns = numbers_as_words[:max_depth]
+    # new df with only the new columns for each source_key
     hierarchy_df = pd.DataFrame(data=None, index=df.index, columns=columns)
     for i, row in df.iterrows():
         mosaic_list = row['symbol_list']
@@ -189,9 +190,8 @@ def build_all_scrape():
     pathfile = os.path.join(path, file_for_cleaned_metadata)
     metadata_df = pd.read_pickle(pathfile)
 
-    extra_columns = [TAB_DESCRIPTION, LOCATION]
-    report_df = report_df.join(metadata_df[extra_columns])
-    columns = list(hierarchy_df.columns) + extra_columns + list(flat_hierarchy_df.columns)
+    report_df = report_df.join(metadata_df)
+    columns = list(hierarchy_df.columns) + metadata_enrich_columns + list(flat_hierarchy_df.columns)
     report_df = report_df[columns]
 
     pathfile = os.path.join(path, xlsx_for_scrape_result)
@@ -199,60 +199,5 @@ def build_all_scrape():
         report_df.to_excel(writer, sheet_name='scrape_result')
 
 
-def get_mapping_df(df):
-    index = pd.Index(data=[], name=SOURCE_KEY)
-    mapping_df = pd.DataFrame(data=None, index=index, columns=[leaf, branch])
-    for i, row in df.iterrows():
-        # replace empty string and drop; drop method fails if index is missing
-        row.replace(to_replace='', value=np.NaN, inplace=True)
-        row.dropna(inplace=True)
-        # find the rightmost column index and value for leaf
-        max_column = row.index[-1]
-        max_value = row.loc[max_column]
-        mapping_df.at[i, leaf] = f'{max_column}:{max_value}'
-        # create branch syntax using all nodes
-        branch_str = '@'.join(row.values)
-        mapping_df.at[i, branch] = f'{max_column}:{branch_str}'
-    return mapping_df
-
-
 if __name__ == '__main__':
-    # build_all_scrape()
-
-    pathfile = os.path.join(path, file_for_scrape_result)
-    report_df = pd.read_pickle(pathfile)
-
-    # make a copy of the df and remove old columns
-    first_column_name = 0
-    first_column_index = report_df.columns.get_loc(first_column_name)
-    report_df = report_df[report_df.columns[:first_column_index]]
-
-    # and rebuild with option to remove text
-    report_df = build_flat_hierarchy_from_list(report_df, remove_texts=False)
-
-    # for upload to mosaic
-    mapping_df = get_mapping_df(report_df)
-    hierarchy_df = report_df.drop_duplicates(ignore_index=True)
-
-    # collect the errors generated when we upload using leaf format
-    pathfile = os.path.join(path, xlsx_for_mapping_errors)
-    errors_df = pd.read_excel(pathfile)
-
-    # and now use these source_keys to select the right upload format
-    error_keys = errors_df[SOURCE_KEY].values
-
-    # munge alert
-    mask = mapping_df.index.isin(error_keys)
-    branch_df = mapping_df.loc[mask, branch]
-    leaf_df = mapping_df.loc[~mask, leaf]
-    mapping2_df = pd.concat([leaf_df, branch_df], axis='index')
-
-    # save the hierarchy; smash the patriarchy
-    pathfile = os.path.join(path, csv_for_hierarchy_result)
-    hierarchy_df.to_csv(pathfile, index=False)
-
-    # save the mapping; for some reason this needs to be xlsx!
-    pathfile = os.path.join(path, xlsx_for_mapping_result)
-    with pd.ExcelWriter(pathfile) as writer:
-        mapping_df.to_excel(writer, sheet_name='mapping')
-
+    build_all_scrape()

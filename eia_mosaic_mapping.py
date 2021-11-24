@@ -1,171 +1,101 @@
-'''
-this script uses the raw metadata derived from mosaic tsdb
-and generates mosaic mappings for upload
-output is an xls for human consumption
-'''
-
 import os
+import numpy as np
 import pandas as pd
-from collections import namedtuple
-from constants import TAB_DESCRIPTION, LOCATION, UNIT, DESCRIPTION, \
-    path, file_for_raw_metadata, csv_for_hierarchy_result
+from constants import path, csv_for_hierarchy_result, xlsx_for_mapping_result, SOURCE_KEY, numbers_as_words, \
+    file_for_scrape_result, xlsx_for_mapping_errors
+from eia_scrape import leaf, branch
 
-REMAINING_DESCRIPTION = 'remaining description'
-MAP_PRODUCT = 'map_product'
-MAP_MEASURE = 'map_measure'
-MAP_LOCATION = 'map_location'
-MAP_SUBPRODUCT = 'map_sub_product'
-MAP_UNIT = 'map_unit'
 
-# hartree mapping keys
-COUNTRY = 'country'
-INTRA_COUNTRY_REGION = 'intra_country_region'
-MEASURE = 'measure'
-SUB_MEASURE = 'sub_measure'
+def get_mapping_df(df):
+    # build a df with both leaf and full branch syntax
+    index = pd.Index(data=[], name=SOURCE_KEY)
+    mapping_df = pd.DataFrame(data=None, index=index, columns=[leaf, branch])
+    for i, row in df.iterrows():
+        # replace empty string and drop; drop method fails if index is missing
+        row.replace(to_replace='', value=np.NaN, inplace=True)
+        row.dropna(inplace=True)
+        # find the rightmost column index and value for leaf
+        max_column = row.index[-1]
+        max_value = row.loc[max_column]
+        mapping_df.at[i, leaf] = f'{max_column}:{max_value}'
+        # create branch syntax using all nodes
+        branch_str = '@'.join(row.values)
+        mapping_df.at[i, branch] = f'{max_column}:{branch_str}'
+    return mapping_df
 
-# dictionary of mappings to list of string searches
-# if a string search of the description field matches
-# then the associated key is the mapping
-product_mapping = {
-    'crude oil': ['crude oil'],
-    'motor gasoline blending components': [
-        'conventional other gasoline blending components',
-        'conventional cbob gasoline blending components',
-        'conventional gtab gasoline blending components',
-        'gasoline blending components'],
-    'fuel ethanol': [
-        'fuel ethanol'],
-    'finished motor gasoline': [
-        'reformulated motor gasoline',
-        'reformulated rbob',
-        'reformulated rbob with alcohol',
-        'conventional motor gasoline',
-        'finished motor gasoline',
-        'finished conventional motor gasoline',
-        'finished conventional motor gasoline with ethanol',
-        'finished reformulated motor gasoline',
-        'finished reformulated motor gasoline with ethanol',
-        'motor gasoline',
-    ],
-    'kerosene type jet fuel': [
-        'kerosene-type jet fuel'],
-    'distillate fuel oil': [
-        'distillate fuel oil',
-    ],
-    'residual fuel oil': ['residual fuel oil'],
-    'propane/propylene': ['propane/propylene',
-                          'propane and propylene']
-}
 
-# these are 1:1 string searches
-sub_product_mapping = {'conventional': 'conventional',
-                       'reformulated': 'reformulated',
-                       'diesel': 'distillate fuel oil greater than 15 to 500 ppm sulfur',
-                       'gasoil': 'distillate fuel oil 0 to 15 ppm sulfur',
-                       'gtab': 'gtab',
-                       'kerosene-type jet fuel': 'kerosene-type jet fuel'}
+def build_all_mapping():
+    # get the saved scrape result
+    pathfile = os.path.join(path, file_for_scrape_result)
+    report_df = pd.read_pickle(pathfile)
 
-# this dictionary works in the opposite direction
-# now if the key matches; the value is a dictionary that represents the mosaic mapping
-location_mapping = {
-    'East Coast (PADD 1)': {INTRA_COUNTRY_REGION: 'PADD I'},
-    'Gulf Coast (PADD 3)': {INTRA_COUNTRY_REGION: 'PADD III'},
-    'Midwest (PADD 2)': {INTRA_COUNTRY_REGION: 'PADD II'},
-    'Midwest (PADD2)': {INTRA_COUNTRY_REGION: 'PADD II'},
-    'West Coast (PADD 5)': {INTRA_COUNTRY_REGION: 'PADD IV & V'},
-    'Rocky Mountain (PADD 4)': {INTRA_COUNTRY_REGION: 'PADD IV & V'},
-    'Rocky Mountains (PADD 4)': {INTRA_COUNTRY_REGION: 'PADD IV & V'},
-    'Lower 48 States': {COUNTRY: 'United States', INTRA_COUNTRY_REGION: ''},
-    'U.S.': {COUNTRY: 'United States'},
-}
+    # select flat hierarchy from RHS of df
+    first_column_index = report_df.columns.get_loc('zero')
+    report_df = report_df[report_df.columns[first_column_index:]]
 
-# again if the key matches; the value is a dictionary that represents the mosaic mapping
-measure_mapping = {
-    'Imports': {MEASURE: 'imports', SUB_MEASURE: ''},  # this is new
-    'Crude Oil Production': {MEASURE: 'imports', SUB_MEASURE: ''},
-    'Days of Supply (Number of Days)': {MEASURE: 'supply', SUB_MEASURE: ''},
-    'Ethanol Plant Production': {MEASURE: 'production', SUB_MEASURE: 'refinery output'},
-    'Exports': {MEASURE: 'exports', SUB_MEASURE: ''},
-    'Lower 48 Weekly Supply Estimates': {MEASURE: 'supply', SUB_MEASURE: ''},
-    'Net Imports (Including SPR)': {MEASURE: 'imports', SUB_MEASURE: ''},
-    'Product Supplied': {MEASURE: 'supply', SUB_MEASURE: ''},
-    'Refiner and Blender Net Inputs': {MEASURE: 'input', SUB_MEASURE: 'refinery output'},
-    'Refiner and Blender Net Production': {MEASURE: 'production', SUB_MEASURE: 'refinery output'},
-    'Refiner Inputs and Utilization': {MEASURE: 'input', SUB_MEASURE: 'refinery output'},
-    'Stocks': {MEASURE: 'stocks', SUB_MEASURE: 'closing'},
-    'Ultra Low Sulfur Distillate': {MEASURE: 'supply', SUB_MEASURE: ''},
-    'Weekly Preliminary Crude Imports by Top 10 Countries of Origin (ranking based on 2018 Petroleum Supply Monthly data)': {MEASURE: 'imports', SUB_MEASURE: ''},
-}
+    # create hierarchy
+    hierarchy_df = report_df.drop_duplicates(ignore_index=True)
+    # create mapping with both leaf and branch syntax
+    # naive because theres no awareness of upload errors at this stage
+    naive_mapping_df = get_mapping_df(report_df)
 
-# again if the key matches; the value is a dictionary that represents the mosaic mapping
-unit_mapping = {
-    'Thousand Barrels per Day': {'unit': 'kbd'},
-    'Thousand Barrels': {'unit': 'kb'},
-    'Thousand Barrels per Calendar Day': {'unit', 'kbd'},
-    'Percent': {'unit': '%'},
-    'Number of Days': {'unit': 'd'},  #  this one is new
-}
+    # =================================================================
+    # there will be upload errors; this is an iterative approach to fixing
 
-# define some post-event corrections for any mapping
-# the order of this list is important; corrections will be applied in sequence
-SearchReplace = namedtuple('SearchReplace', ['search', 'replace'])
-corrections_mapping = {
-    MAP_MEASURE: [SearchReplace('capacity', 'Capacity'), SearchReplace('utilization', 'Utilization')],
-}
+    # collect all the errors; different sheets have different lists
+    # keep this xls in source control; just in case
+    x = pd.ExcelFile(xlsx_for_mapping_errors)
+    errors_dict = {sheet_name: x.parse(sheet_name) for sheet_name in x.sheet_names}
+
+    # ===================
+    # first set of errors
+    errors_df = errors_dict['one']
+    error_keys = errors_df[SOURCE_KEY].values
+
+    # assume errors are symbols that require the branch syntax
+    mask = naive_mapping_df.index.isin(error_keys)
+    branch_df = naive_mapping_df.loc[mask, branch]
+    leaf_df = naive_mapping_df.loc[~mask, leaf]
+    final_mapping_df = pd.concat([leaf_df, branch_df], axis='index')
+
+    # ====================
+    # second set of errors
+    errors_df = errors_dict['two']
+    error_keys = errors_df[SOURCE_KEY].values
+
+    # more butchery; remove the zeroth node for 'Total Products'
+    mask = final_mapping_df.index.isin(error_keys)
+    texts = final_mapping_df[mask].str.split(':').values
+    new_texts = []
+    for prefix, text in texts:
+        if text.startswith('Total Products@'):
+            i = numbers_as_words.index(prefix)
+            new_prefix = numbers_as_words[i - 1]
+            new_text = text.replace('Total Products@', '')
+            new_texts.append([new_prefix, new_text])
+        else:
+            new_texts.append([prefix, text])
+    data = [':'.join(text) for text in new_texts]
+    index = final_mapping_df[mask].index
+    total_products_df = pd.DataFrame(data=data, index=index)
+    final_mapping_df = pd.concat([final_mapping_df[~mask], total_products_df], axis='index')
+
+    # =================================================================
+    # third set of errors; we didnt get this far
+    errors_df = errors_dict['three']
+    error_keys = errors_df[SOURCE_KEY].values
+
+    # =================================================================
+    # save the mapping
+    pathfile = os.path.join(path, xlsx_for_mapping_result)
+    with pd.ExcelWriter(pathfile) as writer:
+        final_mapping_df.to_excel(writer, sheet_name='mapping')
+
+    # save the hierarchy; smash the patriarchy
+    pathfile = os.path.join(path, csv_for_hierarchy_result)
+    hierarchy_df.to_csv(pathfile, index=False)
 
 
 if __name__ == '__main__':
-    # load the metadata
-    file = os.path.join(path, file_for_raw_metadata)
-    metadata_df = pd.read_pickle(file)
+    build_all_mapping()
 
-    # standardise the label and the content
-    metadata_df[DESCRIPTION] = metadata_df['Description'].str.lower()
-    metadata_df.drop('Description', axis='columns')
-
-    analysis_df = metadata_df.copy(deep=True)
-    # append new columns
-    analysis_df[REMAINING_DESCRIPTION] = ''
-    analysis_df[MAP_PRODUCT] = ''
-    analysis_df[MAP_MEASURE] = ''
-    analysis_df[MAP_LOCATION] = ''
-    analysis_df[REMAINING_DESCRIPTION] = analysis_df[DESCRIPTION].str.lower()
-
-    # text search description to determine product
-    for key, searches in product_mapping.items():
-        for search in searches:
-            # regex search returns series of boolean
-            pattern = f'\\b({search})\\b'
-            df = analysis_df[DESCRIPTION].str.contains(pattern)
-            df.name = key + '|' + search
-            # add a column with the boolean flag
-            analysis_df = pd.concat([analysis_df, df], axis='columns')
-            # remove the search text from the description so we can see whats left
-            analysis_df[REMAINING_DESCRIPTION] = analysis_df[REMAINING_DESCRIPTION].str.replace(pattern, '', regex=True)
-            # add the product mapping category
-            analysis_df.loc[df.values, MAP_PRODUCT] = key
-        # turn boolean into integer values so we can sum them
-        analysis_df[[key + '|' + s for s in searches]] = analysis_df[[key + '|' + s for s in searches]].applymap(lambda x: int(x))
-
-    # simple mapping
-    analysis_df[MAP_MEASURE] = analysis_df[TAB_DESCRIPTION].map(measure_mapping)
-    analysis_df[MAP_LOCATION] = analysis_df[LOCATION].map(location_mapping)
-    analysis_df[MAP_UNIT] = analysis_df[UNIT].map(unit_mapping)
-
-    # corrections to measures
-    for correction in corrections_mapping[MAP_MEASURE]:
-        df = analysis_df[DESCRIPTION].str.contains(correction.search)
-        analysis_df.loc[df.values, MAP_MEASURE] = correction.replace
-
-    # simple string search for sub-product mappings
-    for key, search in sub_product_mapping.items():
-        df = analysis_df[DESCRIPTION].str.contains(search)
-        analysis_df.loc[df.values, MAP_SUBPRODUCT] = key
-
-    columns = [TAB_DESCRIPTION, LOCATION, DESCRIPTION, REMAINING_DESCRIPTION, MAP_PRODUCT, MAP_SUBPRODUCT, MAP_MEASURE, MAP_LOCATION, MAP_UNIT]
-    report_df = analysis_df[columns]
-
-    # save as xls
-    pathfile = os.path.join(path, csv_for_hierarchy_result)
-    with pd.ExcelWriter(pathfile) as writer:
-        report_df.to_excel(writer, sheet_name='mapping_result')
