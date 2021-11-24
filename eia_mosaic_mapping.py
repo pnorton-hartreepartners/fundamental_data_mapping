@@ -3,7 +3,9 @@ import numpy as np
 import pandas as pd
 from constants import path, csv_for_hierarchy_result, xlsx_for_mapping_result, SOURCE_KEY, numbers_as_words, \
     file_for_scrape_result, xlsx_for_mapping_errors
-from eia_scrape import leaf, branch
+
+leaf = 'leaf'
+branch = 'branch'
 
 
 def get_mapping_df(df):
@@ -98,4 +100,3 @@ def build_all_mapping():
 
 if __name__ == '__main__':
     build_all_mapping()
-

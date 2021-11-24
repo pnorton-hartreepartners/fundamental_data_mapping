@@ -37,9 +37,6 @@ scrape_columns = ['text', 'level', SOURCE_KEY, 'year_start', 'year_end']
 report_columns = scrape_columns + ['level_change', 'symbol_list', 'full_name']
 report_columns.remove(SOURCE_KEY)  # because its the index now
 
-leaf = 'leaf'
-branch = 'branch'
-
 
 def get_soups_for_urls(urls):
     soups = []
