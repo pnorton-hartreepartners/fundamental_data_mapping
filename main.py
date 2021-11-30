@@ -10,7 +10,7 @@ import argparse
 from analyst_data_views.common.db_flattener import getFlatRawDF
 from constants import path, file_for_mosaic_data, \
     file_for_raw_metadata, SAVE, LOAD, REFRESH, csv_for_timeseries, \
-    terse_timeseries_columns, file_for_timeseries
+    terse_timeseries_columns, file_for_timeseries, xlsx_for_timeseries
 from eia_seasonality_dates import build_seasonality_ts
 from eia_metadata import get_metadata_df, build_clean_metadata
 from eia_scrape import build_all_scrape
@@ -66,6 +66,10 @@ if __name__ == '__main__':
 
     pathfile = os.path.join(path, csv_for_timeseries)
     timeseries_df[terse_timeseries_columns].to_csv(pathfile, index=False)
+
+    pathfile = os.path.join(path, xlsx_for_timeseries)
+    with pd.ExcelWriter(pathfile) as writer:
+        timeseries_df[terse_timeseries_columns].to_excel(writer, sheet_name='mapping')
 
     if args.mode == SAVE:
         # build metadata and save to file

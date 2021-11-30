@@ -1,7 +1,5 @@
 import os
-
 import pandas as pd
-
 from constants import path, csv_for_timeseries, xlsx_for_seasonality_timeseries
 
 
@@ -23,8 +21,9 @@ def build_calyear_weekly_seasonality(dates):
 
     # extend this year so we don't have to run script every week
     dates = dates.union(incremental_dates)
+    index = pd.Index(dates, name='date')
 
-    df = pd.DataFrame(index=dates)
+    df = pd.DataFrame(index=index)
     for i, row in df.iterrows():
         end_of_year = end_of_years[i.year]
         # returns a negative difference so charting works in the right direction
