@@ -40,7 +40,7 @@ def get_full_timeseries(data_mode):
 
 
 def build_basic_metadata(timeseries_df):
-    exclude_columns = ['updated_at', 'date', 'value']
+    exclude_columns = ['Sheet', 'updated_at', 'date', 'value']
     columns = [c for c in timeseries_df.columns if c not in exclude_columns]
     metadata_df = get_metadata_df(timeseries_df, columns)
     pathfile = os.path.join(path, file_for_raw_metadata)
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     '''
     python main.py --mode load
     # refresh means... just refresh the timeseries when new data is published
-    # load means... get the timeseries from the saved pickle
+    # load means... load the timeseries from the saved pickle
     # save means... build and save everything
     '''
     args = get_args()
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     pathfile = os.path.join(path, xlsx_for_timeseries)
     with pd.ExcelWriter(pathfile) as writer:
-        timeseries_df[terse_timeseries_columns].to_excel(writer, sheet_name='mapping')
+        timeseries_df[terse_timeseries_columns].to_excel(writer, sheet_name='timeseries')
 
     if args.mode == SAVE:
         # build metadata and save to file

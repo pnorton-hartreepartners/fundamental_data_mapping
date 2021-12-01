@@ -1,5 +1,6 @@
 '''
-this script uses the raw metadata derived from mosaic tsdb
+this was my FIRST attempt
+script uses the raw metadata derived from mosaic tsdb
 and generates mosaic mappings for upload
 output is an xls for human consumption
 '''

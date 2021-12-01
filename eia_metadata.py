@@ -7,7 +7,7 @@ this is NOT part of the mosaic mapping exercise
 import os
 import pandas as pd
 from constants import path, file_for_raw_metadata, SOURCE_KEY, DESCRIPTION, LOCATION, xlsx_for_cleaned_metadata, \
-    file_for_cleaned_metadata
+    file_for_cleaned_metadata, TAB_DESCRIPTION
 
 
 def get_all_metadata_for_symbol(metadata_df, source_key):
@@ -16,6 +16,12 @@ def get_all_metadata_for_symbol(metadata_df, source_key):
 
 def get_single_metadata_dict_for_all_symbols(metadata_df, label):
     return dict(zip(metadata_df.index, metadata_df[label].values))
+
+
+def metadata_health_check(df):
+    # confirm there is only one entry for every combination of these columns
+    x = df.groupby([TAB_DESCRIPTION, 'Description', LOCATION]).size()
+    assert x[x > 1].empty
 
 
 def get_metadata_df(df, columns):
@@ -50,7 +56,7 @@ def clean_location_metadata_df(df):
                             ]
 
     for replacement in list_of_replacements:
-        df[LOCATION] = df[LOCATION].replace(*replacement)
+        df[LOCATION] = df[LOCATION].replace(replacement)
 
 
 def build_clean_metadata():
@@ -58,9 +64,9 @@ def build_clean_metadata():
     pathfile = os.path.join(path, file_for_raw_metadata)
     metadata_df = pd.read_pickle(pathfile)
 
-    # clean it
-    # clean_description_metadata_df(metadata_df)
+    # clean it and check it
     clean_location_metadata_df(metadata_df)
+    metadata_health_check(metadata_df)
 
     # save it
     pathfile = os.path.join(path, file_for_cleaned_metadata)
