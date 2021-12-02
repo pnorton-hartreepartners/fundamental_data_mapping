@@ -71,6 +71,10 @@ if __name__ == '__main__':
     with pd.ExcelWriter(pathfile) as writer:
         timeseries_df[terse_timeseries_columns].to_excel(writer, sheet_name='timeseries')
 
+    # build seasonality dates... at the moment this needs to be run every week
+    # due to a bug with the projection for current year
+    build_seasonality_ts()
+
     if args.mode == SAVE:
         # build metadata and save to file
         build_basic_metadata(timeseries_df)
@@ -80,9 +84,6 @@ if __name__ == '__main__':
 
         # run webscrape, build metadata and save to file
         build_all_scrape()
-
-        # build seasonality dates
-        build_seasonality_ts()
 
         # identify leaf nodes
         build_all_tree_analysis()
