@@ -10,7 +10,7 @@ def build_calyear_weekly_seasonality(dates):
 
     def incremental_dates_for_year(last_date):
         # extend with lots of weeks
-        incremental_dates = pd.date_range(last_date, freq="W", periods=53)
+        incremental_dates = pd.date_range(last_date, freq="7D", periods=53)
         # trim to the current year
         return incremental_dates[incremental_dates.year == last_date.year]
 
