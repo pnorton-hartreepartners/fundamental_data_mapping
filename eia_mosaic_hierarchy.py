@@ -5,19 +5,6 @@ from constants import path, xlsx_for_manual_hierarchy, file_for_scrape_result, \
     file_for_mapping_preparation
 
 
-def build_hierarchy(final_df):
-    # prepare for upload to mosaic
-    hierarchy_df = final_df['new_hierarchy'].drop_duplicates()
-    hierarchy_df.sort_values(axis='index', inplace=True)
-
-    # create the hierarchy as one value per column
-    flat_hierarchy_df = build_flat_hierarchy_from_list(hierarchy_df)
-
-    # save to csv for upload to mosaic
-    pathfile = os.path.join(path, csv_for_hierarchy_result)
-    flat_hierarchy_df.to_csv(pathfile, index=False)
-
-
 def build_hierarchy_analysis():
     # collect manual mapping from xls
     x = pd.ExcelFile(xlsx_for_manual_hierarchy)
@@ -58,7 +45,7 @@ def build_hierarchy_analysis():
     # ================================================================
     # get both the original and the proposed hierarchy side-by-side for visual inspection
 
-    # add the new hierarchy
+    # add the new hierarchy from the Imports table
     result_df1 = pd.merge(clean_mapping_df, scrape_result_df['full_name'],
                           left_on=HIERARCHY_KEY, right_index=True)
     result_df1.rename(columns={'full_name': 'new_hierarchy'}, inplace=True)
@@ -135,6 +122,19 @@ def build_flat_hierarchy_from_list(df):
     return hierarchy_df
 
 
+def build_hierarchy(final_df):
+    # prepare for upload to mosaic
+    hierarchy_df = final_df['new_hierarchy'].drop_duplicates()
+    hierarchy_df.sort_values(axis='index', inplace=True)
+
+    # create the hierarchy as one value per column
+    flat_hierarchy_df = build_flat_hierarchy_from_list(hierarchy_df)
+
+    # save to csv for upload to mosaic
+    pathfile = os.path.join(path, csv_for_hierarchy_result)
+    flat_hierarchy_df.to_csv(pathfile, index=False)
+
+
 if __name__ == '__main__':
     # get the original and proposed naive hierarchy for each symbol
     # the naive hierarchy is solely described by the manual mapping xls
@@ -143,7 +143,8 @@ if __name__ == '__main__':
     # some name fixes are applied to the new hierarchy
     final_df = apply_name_fixes(analysis_df)
 
-    # save it because now we have to extend to all locations
+    # save it because this relates source_key to hierarchy
+    # and will be an input to the mapping exercise
     pathfile = os.path.join(path, file_for_mapping_preparation)
     final_df.to_pickle(pathfile)
 

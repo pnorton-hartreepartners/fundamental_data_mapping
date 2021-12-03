@@ -70,7 +70,7 @@ def build_mosaic_mapper_df():
     metadata_df = pd.read_pickle(pathfile)
 
     # extend to all locations (from just united states)
-    location_mapper_df = get_locations_mapper_df(df=metadata_df)
+    location_mapper_df = get_locations_mapper_df(metadata_df=metadata_df)
     all_locations_hierarchy_df = get_hierarchy_for_all_locations_df(hierarchy_df=hierarchy_df, location_mapper_df=location_mapper_df)
 
     # naive mapping using just the leaf notation (not the full branch)
