@@ -5,26 +5,26 @@ from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, \
     numbers_as_words, xlsx_for_mapping_result
 
 
-def get_locations_mapper_df(df):
+def get_locations_mapper_df(metadata_df):
     # we need to map U.S. to the other locations
-    # so here we self-join on the columns 'TabDescription' and 'Description'
+    # so here we self-join on the columns 'TabDescription' and 'Description' of our metadata
     # and return a df with the location mapping only
-    df.reset_index(inplace=True)
-    self_df = df.copy(deep=True)
+    metadata_df.reset_index(inplace=True)
+    self_df = metadata_df.copy(deep=True)
 
     # the US locations
-    mask = df[LOCATION] == 'U.S.'
-    df = df[mask]
+    mask = metadata_df[LOCATION] == 'U.S.'
+    metadata_df = metadata_df[mask]
 
     # the other locations
     self_join_columns = [TAB_DESCRIPTION, DESCRIPTION]
     self_df = self_df[[LOCATION, SOURCE_KEY] + self_join_columns]
 
-    df_result = pd.merge(df, self_df,
-                   how='inner', left_on=self_join_columns, right_on=self_join_columns,
-                   suffixes=['_US', None])
-    df_result.set_index(SOURCE_KEY, drop=True, inplace=True)
-    return df_result[[SOURCE_KEY + '_US', LOCATION]]
+    mapper_df = pd.merge(metadata_df, self_df,
+                         how='inner', left_on=self_join_columns, right_on=self_join_columns,
+                         suffixes=['_US', None])
+    mapper_df.set_index(SOURCE_KEY, drop=True, inplace=True)
+    return mapper_df[[SOURCE_KEY + '_US', LOCATION]]
 
 
 def get_hierarchy_for_all_locations_df(hierarchy_df, location_mapper_df):
