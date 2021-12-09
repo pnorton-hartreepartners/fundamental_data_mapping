@@ -48,7 +48,7 @@ def create_leaf_notation_df(df):
     return df
 
 
-def apply_corrections(df, corrections):
+def apply_path_corrections(df, corrections):
     # mosaic adds this nomenclature to differentiate using some portion of the path to the leaf
     for pattern, backward in corrections:
         mask = df['mosaic_upload'] == pattern
@@ -82,7 +82,7 @@ def build_mosaic_mapper_df():
 
     # apply corrections due to mosaic hierarchy logic
     corrections = [('five:Blended with Fuel Ethanol', 2)]
-    df = apply_corrections(mapping_df, corrections)
+    df = apply_path_corrections(mapping_df, corrections)
 
     # save file for upload
     pathfile = os.path.join(path, xlsx_for_mapping_result)

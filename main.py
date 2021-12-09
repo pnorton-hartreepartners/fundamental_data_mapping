@@ -71,8 +71,7 @@ if __name__ == '__main__':
     with pd.ExcelWriter(pathfile) as writer:
         timeseries_df[terse_timeseries_columns].to_excel(writer, sheet_name='timeseries')
 
-    # build seasonality dates... at the moment this needs to be run every week
-    # due to a bug with the projection for current year
+    # build seasonality dates... run every week in case of changes to reporting dates
     build_seasonality_ts()
 
     if args.mode == SAVE:

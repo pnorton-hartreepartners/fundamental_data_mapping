@@ -97,6 +97,11 @@ def apply_name_fixes(df):
     for source_key, hierarchy in mapper.items():
         df.at[source_key, 'new_hierarchy'] = hierarchy
 
+    # illegal characters for mapper
+    corrections = [(r'/', ' '), (r'(', ''), (r')', '')]
+    for pattern, replacement in corrections:
+        df['new_hierarchy'] = df['new_hierarchy'].str.replace(pattern, replacement)
+
     return df
 
 
