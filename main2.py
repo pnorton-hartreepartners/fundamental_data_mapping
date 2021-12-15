@@ -1,3 +1,8 @@
+'''
+this script builds the hierarchy data for eia products
+and all the mapping
+'''
+
 import os
 import pandas as pd
 from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result
@@ -41,4 +46,3 @@ if __name__ == '__main__':
         for sheet_name, df in xls_sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    

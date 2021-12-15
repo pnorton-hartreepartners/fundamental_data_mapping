@@ -1,3 +1,9 @@
+'''
+this script builds all the data for the tableau workbook
+that presents all the weekly eia data
+it includes a scrape of the webpage that defines the hierarchy
+'''
+
 import os
 
 os.environ['IGNITE_HOST_OVERWRITE'] = 'jdbc.dev.mosaic.hartreepartners.com'

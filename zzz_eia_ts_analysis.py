@@ -16,6 +16,9 @@ CALCULATED = 'calculated'
 DATE = 'date'
 VALUE = 'value'
 
+def get_single_metadata_dict_for_all_symbols(metadata_df, label):
+    return dict(zip(metadata_df.index, metadata_df[label].values))
+
 
 def build_comparison(df, source_key, source_keys):
     # subtotal
