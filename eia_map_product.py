@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, \
     file_for_cleaned_metadata, file_for_mapping_preparation, DESCRIPTION, \
-    numbers_as_words, xlsx_for_mapping_result
+    numbers_as_words, xlsx_for_map_product_result
 
 
 def get_locations_mapper_df(metadata_df):
@@ -85,7 +85,7 @@ def build_mosaic_mapper_df():
     df = apply_path_corrections(mapping_df, corrections)
 
     # save file for upload
-    pathfile = os.path.join(path, xlsx_for_mapping_result)
+    pathfile = os.path.join(path, xlsx_for_map_product_result)
     with pd.ExcelWriter(pathfile) as writer:
         df['mosaic_upload'].to_excel(writer, sheet_name='product_mapping')
 

@@ -11,7 +11,7 @@ to select the right one
 import os
 import numpy as np
 import pandas as pd
-from constants import path, csv_for_hierarchy_result, xlsx_for_mapping_result, SOURCE_KEY, numbers_as_words, \
+from constants import path, csv_for_hierarchy_result, xlsx_for_map_product_result, SOURCE_KEY, numbers_as_words, \
     file_for_scrape_result, xlsx_for_mapping_errors
 
 LEAF = 'leaf'
@@ -99,7 +99,7 @@ def build_all_mapping():
 
     # =================================================================
     # save the mapping
-    pathfile = os.path.join(path, xlsx_for_mapping_result)
+    pathfile = os.path.join(path, xlsx_for_map_product_result)
     with pd.ExcelWriter(pathfile) as writer:
         final_mapping_df.to_excel(writer, sheet_name='mapping')
 
