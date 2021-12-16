@@ -119,25 +119,25 @@ def build_hierarchy_from_indent(df):
     return df
 
 
-def build_flat_hierarchy_from_list(df, remove_texts=False):
-    # map source_key to required field
-    label = 'text'
-    mapper = dict(zip(df.index, df[label].values))
-    # define new columns
-    max_depth = df['symbol_list'].apply(len).max()
-    columns = numbers_as_words[:max_depth]
-    # new df with only the new columns for each source_key
-    hierarchy_df = pd.DataFrame(data=None, index=df.index, columns=columns)
-    for i, row in df.iterrows():
-        mosaic_list = row['symbol_list']
-        # map symbol to text
-        mosaic_list = list(map(lambda x: mapper[x], mosaic_list))
-        if remove_texts:
-            # remove according to config list
-            mosaic_list = [e for e in mosaic_list if e not in manually_remove_texts]
-        # add the columns of data
-        hierarchy_df.loc[i] = mosaic_list + [''] * (max_depth - len(mosaic_list))
-    return hierarchy_df
+# def build_flat_hierarchy_from_list(df, remove_texts=False):
+#     # map source_key to required field
+#     label = 'text'
+#     mapper = dict(zip(df.index, df[label].values))
+#     # define new columns
+#     max_depth = df['symbol_list'].apply(len).max()
+#     columns = numbers_as_words[:max_depth]
+#     # new df with only the new columns for each source_key
+#     hierarchy_df = pd.DataFrame(data=None, index=df.index, columns=columns)
+#     for i, row in df.iterrows():
+#         mosaic_list = row['symbol_list']
+#         # map symbol to text
+#         mosaic_list = list(map(lambda x: mapper[x], mosaic_list))
+#         if remove_texts:
+#             # remove according to config list
+#             mosaic_list = [e for e in mosaic_list if e not in manually_remove_texts]
+#         # add the columns of data
+#         hierarchy_df.loc[i] = mosaic_list + [''] * (max_depth - len(mosaic_list))
+#     return hierarchy_df
 
 
 def build_hierarchy_name_from_list(df):
@@ -171,13 +171,16 @@ def build_all_scrape():
     hierarchy_df = build_hierarchy_name_from_list(hierarchy_df)
 
     # prepare for mosaic upload by building a flat hierarchy version w integer column names
-    flat_hierarchy_df = pd.DataFrame()
-    for df in dfs:
-        new_df = build_flat_hierarchy_from_list(df, remove_texts=False)
-        flat_hierarchy_df = pd.concat([flat_hierarchy_df, new_df], axis='rows')
-
-    # join it up
-    report_df = hierarchy_df.join(flat_hierarchy_df)
+    # this is too early
+    # TODO delete it
+    # flat_hierarchy_df = pd.DataFrame()
+    # for df in dfs:
+    #     new_df = build_flat_hierarchy_from_list(df, remove_texts=False)
+    #     flat_hierarchy_df = pd.concat([flat_hierarchy_df, new_df], axis='rows')
+    #
+    # # join it up
+    # report_df = hierarchy_df.join(flat_hierarchy_df)
+    report_df = hierarchy_df
 
     # save to file
     pathfile = os.path.join(path, file_for_scrape_result)
@@ -188,7 +191,7 @@ def build_all_scrape():
     metadata_df = pd.read_pickle(pathfile)
 
     report_df = report_df.join(metadata_df)
-    columns = list(hierarchy_df.columns) + metadata_enrich_columns + list(flat_hierarchy_df.columns)
+    columns = list(hierarchy_df.columns) + metadata_enrich_columns  # + list(flat_hierarchy_df.columns)
     report_df = report_df[columns]
 
     pathfile = os.path.join(path, xlsx_for_scrape_result)

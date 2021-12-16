@@ -7,7 +7,7 @@ import os
 import pandas as pd
 from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result
 from eia_hierarchy import build_hierarchy_analysis, apply_name_fixes, build_hierarchy
-from eia_map_product import build_mosaic_mapper_df
+from eia_map_product import build_map_product_df
 from eia_map_remaining import add_mappings_and_corrections, extract_into_worksheets
 
 if __name__ == '__main__':
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     build_hierarchy(final_df)
 
     # and now the product mapper
-    build_mosaic_mapper_df()
+    build_map_product_df()
 
     # and finally, the remaining measures, units & locations
     # load the raw metadata (dont want the cleaned one)

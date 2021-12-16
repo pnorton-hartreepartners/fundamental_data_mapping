@@ -1,5 +1,13 @@
+'''
+build the naming based on the scraped hierarchy of the Imports table for the US
+make some adjustments to the naming
+and save with the source key so we can build a mapping afterwards
+then finally drop duplicates to create a hierarchy
+'''
+
 import os
 import pandas as pd
+import numpy as np
 from constants import path, xlsx_for_manual_hierarchy, file_for_scrape_result, \
     SOURCE_KEY, TAB_DESCRIPTION, LOCATION, file_for_cleaned_metadata, numbers_as_words, csv_for_hierarchy_result, \
     file_for_mapping_preparation
@@ -34,55 +42,99 @@ def build_hierarchy_analysis():
     mask = pd.isnull(clean_mapping_df[SOURCE_KEY])
     clean_mapping_df = clean_mapping_df[~mask]
 
-    # but we do care about sourcekeys missing from the imports table
-    # in this case we'll use the original hierarchy instead
-    # but we should label that we're doing this
-    clean_mapping_df['missing'] = pd.isnull(clean_mapping_df[HIERARCHY_KEY])
-    # now fill missing values
-    clean_mapping_df.loc[:, [HIERARCHY_KEY, SOURCE_KEY]] = \
-        clean_mapping_df.loc[:, [HIERARCHY_KEY, SOURCE_KEY]].bfill(axis='columns')
+    # and finally add a trivial mapping for our Imports table
+    # obviously this was missing from the xls
+    mask1 = metadata_df[TAB_DESCRIPTION] == 'Imports'
+    mask2 = metadata_df[LOCATION] == 'U.S.'
+    data = metadata_df[mask1 & mask2].index
+    columns = [HIERARCHY_KEY, SOURCE_KEY]
+    imports_df = pd.DataFrame(data=np.array([data, data]).T, columns=columns)
+
+    clean_mapping_df = pd.concat([clean_mapping_df, imports_df], axis='index')
 
     # ================================================================
-    # get both the original and the proposed hierarchy side-by-side for visual inspection
+    # get the original scrape hierarchy
+    # and the proposed mapped hierarchy side-by-side
 
-    # add the new hierarchy from the Imports table
-    result_df1 = pd.merge(clean_mapping_df, scrape_result_df['full_name'],
-                          left_on=HIERARCHY_KEY, right_index=True)
+    # get the original scraped hierarchy, just for US location
+    original_hierarchy_df = pd.merge(scrape_result_df, metadata_df[[TAB_DESCRIPTION, LOCATION]],
+                                     left_index=True, right_index=True)
+    mask_location = original_hierarchy_df[LOCATION] == 'U.S.'
+    mask_table = original_hierarchy_df[TAB_DESCRIPTION] == 'Imports'
+    columns = ['full_name', TAB_DESCRIPTION, LOCATION]
+
+    # add the new proposed hierarchy, requested by the manual mapping, from the Imports table
+    result_df1 = pd.merge(original_hierarchy_df.loc[mask_location & mask_table][columns],
+                          clean_mapping_df,
+                          how='left',
+                          left_index=True, right_on=HIERARCHY_KEY)
     result_df1.rename(columns={'full_name': 'new_hierarchy'}, inplace=True)
     result_df1.set_index(SOURCE_KEY, drop=True, inplace=True)
 
-    # and the hierarchy from the mapped symbol
-    result_df2 = pd.merge(clean_mapping_df, scrape_result_df['full_name'],
-                          left_on=SOURCE_KEY, right_index=True)
+    # and the original hierarchy from the web scrape
+    result_df2 = pd.merge(original_hierarchy_df.loc[mask_location, columns],
+                          clean_mapping_df,
+                          how='left',
+                          left_index=True, right_on=SOURCE_KEY)
     result_df2.rename(columns={'full_name': 'original_hierarchy'}, inplace=True)
     result_df2.set_index(SOURCE_KEY, drop=True, inplace=True)
 
     # join the two resultsets
-    result_df = pd.merge(result_df1['new_hierarchy'], result_df2, left_index=True, right_index=True)
+    result_df = pd.merge(result_df1['new_hierarchy'], result_df2,
+                         how='outer',
+                         left_index=True, right_index=True)
 
-    # add some metadata
-    result_df = pd.merge(result_df, metadata_df[[TAB_DESCRIPTION, LOCATION]],
-                         left_on=SOURCE_KEY, right_index=True)
+    # outer join results in nan
+    # so we need to label them as missing to fix later
+    result_df['missing'] = False
+    mask = pd.isnull(result_df['new_hierarchy'])
+    result_df.loc[mask, 'missing'] = True
+    # and copy original
+    result_df.loc[mask, 'new_hierarchy'] = result_df.loc[mask, 'original_hierarchy']
+
     columns = ['original_hierarchy', 'new_hierarchy', 'missing', HIERARCHY_KEY, TAB_DESCRIPTION, LOCATION]
     return result_df[columns]
 
 
 def apply_name_fixes(df):
-    mapper = {'W_EPM0F_YPR_NUS_MBBLD': 'Total | Products | Motor Gasoline | Finished Motor Gasoline (Excl. Adjustment)'}
+    mapper = {
+              # otherwise labelled as 'Total | Products | Finished Motor Gasoline | Finished Motor Gasoline Excl. Adjustment
+              'W_EPM0F_YPR_NUS_MBBLD': 'Total | Products | Motor Gasoline | Finished Motor Gasoline (Excl. Adjustment)',
+              # Net Imports (Including SPR)
+              'WCRNTUS2': 'Total | Crude Oil',
+              'WRPNTUS2': 'Total | Products',
+              'WTTNTUS2': 'Total',
+              # Refiner Inputs and Utilization
+              'WCRRIUS2': 'Total | Crude Oil',
+    }
 
     # all the (non-crude) products category now needs the following prefix
     mask = (df['missing'].values) & (~df['new_hierarchy'].str.contains('Crude'))
-    string = 'Total Products | '
+    string = 'Products | '
     df.loc[mask, 'new_hierarchy'] = string + df.loc[mask, 'new_hierarchy']
 
-    # this word is often contained along the branch and is superfluous
-    string = 'Total '
-    df['new_hierarchy'] = df['new_hierarchy'].str.replace(string, '')
+    # delete the word total from anywhere in the path
+    # unless that is the entire new_hierarchy
+    string = 'Total'  # no lagging space
+    mask = df['new_hierarchy'] != string
 
-    # but in some reports there is a specific root level Total
-    # so add this level with a delimiter
-    mask = df['new_hierarchy'] == 'Total'
-    df.loc[~mask, 'new_hierarchy'] = 'Total | ' + df.loc[~mask, 'new_hierarchy']
+    # remove the root node as its copied over in some cases
+    # escape the pipe delimiter!
+    string = 'Total \| '
+    df.loc[mask, 'new_hierarchy'] = df.loc[mask, 'new_hierarchy'].str.replace(string, '')
+
+    # remove from anywhere in the string
+    string = 'Total '
+    df.loc[mask, 'new_hierarchy'] = df.loc[mask, 'new_hierarchy'].str.replace(string, '')
+
+    # put it back in
+    string = 'Total | '
+    df.loc[mask, 'new_hierarchy'] = \
+        string + df.loc[mask, 'new_hierarchy']
+
+    # if there's no mapping at all then a good default is just Total
+    mask = df['new_hierarchy'] == ''
+    df.loc[mask, 'new_hierarchy'] = 'Total'
 
     # remove these strings for consistency
     strings = [r' \(Excluding Ethanol\)', r' \(Including SPR\)']
@@ -102,6 +154,8 @@ def apply_name_fixes(df):
     for pattern, replacement in corrections:
         df['new_hierarchy'] = df['new_hierarchy'].str.replace(pattern, replacement)
 
+    columns = [TAB_DESCRIPTION, 'new_hierarchy']
+    df.sort_values(by=columns, axis='index', inplace=True)
     return df
 
 

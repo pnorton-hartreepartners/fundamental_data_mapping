@@ -1,3 +1,9 @@
+'''
+the initial hierarchy and mapping data was only for the US location
+now expand for all locations
+then create the required syntax required by the mosaic mapper
+'''
+
 import os
 import pandas as pd
 from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, \
@@ -60,7 +66,7 @@ def apply_path_corrections(df, corrections):
     return df
 
 
-def build_mosaic_mapper_df():
+def build_map_product_df():
     # contains hierarchy for united states symbols only
     pathfile = os.path.join(path, file_for_mapping_preparation)
     hierarchy_df = pd.read_pickle(pathfile)
@@ -91,4 +97,4 @@ def build_mosaic_mapper_df():
 
 
 if __name__ == '__main__':
-    build_mosaic_mapper_df()
+    build_map_product_df()

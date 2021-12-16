@@ -30,7 +30,7 @@ location_mapping = {
     'West Coast (PADD 5)': {INTRA_COUNTRY_REGION: 'PADD IV & V'},
     'Rocky Mountain (PADD 4)': {INTRA_COUNTRY_REGION: 'PADD IV & V'},
     'Rocky Mountains (PADD 4)': {INTRA_COUNTRY_REGION: 'PADD IV & V'},
-    'Lower 48 States': {COUNTRY: 'United States', INTRA_COUNTRY_REGION: ''},
+    'Lower 48 States': {COUNTRY: 'United States'},
     'U.S.': {COUNTRY: 'United States'},
 }
 location_mapping = {k: OrderedDict(v) for k, v in location_mapping.items()}
