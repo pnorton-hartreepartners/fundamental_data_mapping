@@ -21,13 +21,5 @@ if __name__ == '__main__':
     all_df = pd.merge(both_df, scrape_result_df, how='outer', left_index=True, right_index=True)
     all_df.to_clipboard()
 
-
-
-
     print()
-
-
-
-
-
 
