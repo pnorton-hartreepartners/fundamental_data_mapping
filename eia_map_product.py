@@ -8,7 +8,7 @@ import os
 import pandas as pd
 from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, \
     file_for_cleaned_metadata, file_for_mapping_preparation, DESCRIPTION, \
-    numbers_as_words, xlsx_for_map_product_result
+    numbers_as_words, xlsx_for_map_product_result, file_for_raw_metadata, PRODUCT_CODE
 
 
 def get_locations_mapper_df(metadata_df):
@@ -23,7 +23,7 @@ def get_locations_mapper_df(metadata_df):
     metadata_df = metadata_df[mask]
 
     # the other locations
-    self_join_columns = [TAB_DESCRIPTION, DESCRIPTION]
+    self_join_columns = [TAB_DESCRIPTION, PRODUCT_CODE]  # DESCRIPTION is inconsistent
     self_df = self_df[[LOCATION, SOURCE_KEY] + self_join_columns]
 
     mapper_df = pd.merge(metadata_df, self_df,
