@@ -22,6 +22,7 @@ xlsx_for_seasonality_timeseries = 'eia-weekly-seasonality.xlsx'
 csv_for_hierarchy_result = 'eia-weekly-hierarchy-result.csv'
 xlsx_for_map_product_result = 'eia-weekly-map-product-result.xlsx'
 xlsx_for_map_remaining_result = 'eia-weekly-map-remaining-result.xlsx'
+xlsx_for_map_product_analysis = 'eia-weekly-map-product-analysis.xlsx'
 
 csv_for_timeseries = 'eia-weekly-ts.csv'  # around half-a-million rows so use csv; consumed by tableau chart
 xlsx_for_timeseries = 'eia-weekly-ts.xlsx'  # although tableau driver pukes so use xls instead

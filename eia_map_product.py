@@ -8,7 +8,7 @@ import os
 import pandas as pd
 from constants import path, SOURCE_KEY, TAB_DESCRIPTION, LOCATION, \
     file_for_cleaned_metadata, file_for_mapping_preparation, DESCRIPTION, \
-    numbers_as_words, xlsx_for_map_product_result, file_for_raw_metadata, PRODUCT_CODE
+    numbers_as_words, xlsx_for_map_product_result
 
 
 def get_locations_mapper_df(metadata_df):
@@ -23,20 +23,20 @@ def get_locations_mapper_df(metadata_df):
     metadata_df = metadata_df[mask]
 
     # the other locations
-    self_join_columns = [TAB_DESCRIPTION, PRODUCT_CODE]  # DESCRIPTION is inconsistent
+    # PRODUCT_KEY is inconsistent so we correct descriptions when we build metadata
+    # and use the clean result here
+    self_join_columns = [TAB_DESCRIPTION, DESCRIPTION]
     self_df = self_df[[LOCATION, SOURCE_KEY] + self_join_columns]
 
     mapper_df = pd.merge(metadata_df, self_df,
                          how='inner', left_on=self_join_columns, right_on=self_join_columns,
                          suffixes=['_US', None])
-    mapper_df.set_index(SOURCE_KEY, drop=True, inplace=True)
-    return mapper_df[[SOURCE_KEY + '_US', LOCATION]]
+    return mapper_df.set_index(SOURCE_KEY, drop=True)
 
 
 def get_hierarchy_for_all_locations_df(hierarchy_df, location_mapper_df):
-    # using our mapper df we can copy our hierarchy definition to all locations
-    df = pd.merge(hierarchy_df['new_hierarchy'], location_mapper_df, left_index=True, right_on=SOURCE_KEY + '_US')
-    return df['new_hierarchy'].to_frame()
+    # using our mapper df we can copy the hierarchy definition for the US, to all locations
+    return pd.merge(hierarchy_df['new_hierarchy'], location_mapper_df, left_index=True, right_on=SOURCE_KEY + '_US')
 
 
 def hierarchy_to_list(df):
@@ -76,12 +76,14 @@ def build_map_product_df():
     metadata_df = pd.read_pickle(pathfile)
 
     # extend to all locations (from just united states)
-    location_mapper_df = get_locations_mapper_df(metadata_df=metadata_df)
-    all_locations_hierarchy_df = get_hierarchy_for_all_locations_df(hierarchy_df=hierarchy_df, location_mapper_df=location_mapper_df)
+    locations_mapper_df = get_locations_mapper_df(metadata_df=metadata_df)
+    df = locations_mapper_df[[SOURCE_KEY + '_US', LOCATION]]
+    all_locations_hierarchy_df = get_hierarchy_for_all_locations_df(hierarchy_df=hierarchy_df,
+                                                                    location_mapper_df=df)
 
     # naive mapping using just the leaf notation (not the full branch)
-    all_locations_hierarchy_df = hierarchy_to_list(df=all_locations_hierarchy_df)
-    mapping_df = create_leaf_notation_df(df=all_locations_hierarchy_df)
+    df = hierarchy_to_list(df=all_locations_hierarchy_df)
+    mapping_df = create_leaf_notation_df(df=df['list'].to_frame())
 
     # start creating the upload
     mapping_df['mosaic_upload'] = mapping_df['leaf']

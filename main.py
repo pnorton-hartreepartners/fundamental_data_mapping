@@ -18,7 +18,7 @@ from constants import path, file_for_mosaic_data, \
     file_for_raw_metadata, SAVE, LOAD, REFRESH, csv_for_timeseries, \
     terse_timeseries_columns, file_for_timeseries, xlsx_for_timeseries
 from eia_seasonality_dates import build_seasonality_ts
-from eia_metadata import get_metadata_df, build_clean_metadata
+from eia_metadata import _get_metadata_df, build_clean_metadata, build_raw_metadata
 from eia_scrape import build_all_scrape
 from eia_trees import build_all_tree_analysis
 
@@ -45,12 +45,7 @@ def get_full_timeseries(data_mode):
     return timeseries_df
 
 
-def build_basic_metadata(timeseries_df):
-    exclude_columns = ['Sheet', 'updated_at', 'date', 'value']
-    columns = [c for c in timeseries_df.columns if c not in exclude_columns]
-    metadata_df = get_metadata_df(timeseries_df, columns)
-    pathfile = os.path.join(path, file_for_raw_metadata)
-    metadata_df.to_pickle(pathfile)
+
 
 
 if __name__ == '__main__':
@@ -82,7 +77,7 @@ if __name__ == '__main__':
 
     if args.mode == SAVE:
         # build metadata and save to file
-        build_basic_metadata(timeseries_df)
+        build_raw_metadata()
 
         # clean names and locations
         build_clean_metadata()

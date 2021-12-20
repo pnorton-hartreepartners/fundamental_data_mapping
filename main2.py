@@ -5,12 +5,20 @@ and all the mapping
 
 import os
 import pandas as pd
-from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result
+from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result, \
+    file_for_mosaic_data
 from eia_hierarchy import build_hierarchy_analysis, apply_name_fixes, build_hierarchy
 from eia_map_product import build_map_product_df
 from eia_map_remaining import add_mappings_and_corrections, extract_into_worksheets
+from eia_metadata import build_clean_metadata, build_raw_metadata
 
 if __name__ == '__main__':
+    # build metadata and save to file
+    build_raw_metadata()
+
+    # clean descriptions and locations
+    build_clean_metadata()
+
     # get the original and proposed naive hierarchy for each symbol
     # the naive hierarchy is solely described by the manual mapping xls
     analysis_df = build_hierarchy_analysis()
