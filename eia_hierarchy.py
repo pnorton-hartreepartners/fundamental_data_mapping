@@ -12,6 +12,7 @@ from constants import path, xlsx_for_manual_hierarchy, file_for_scrape_result, \
     SOURCE_KEY, TAB_DESCRIPTION, LOCATION, file_for_cleaned_metadata, numbers_as_words, csv_for_hierarchy_result, \
     file_for_mapping_preparation
 
+
 sourcekey_mapper = {
     # otherwise labelled as 'Total | Products | Finished Motor Gasoline | Finished Motor Gasoline Excl. Adjustment
     'W_EPM0F_YPR_NUS_MBBLD': 'Total | Products | Motor Gasoline | Finished Motor Gasoline (Excl. Adjustment)',
@@ -21,8 +22,11 @@ sourcekey_mapper = {
     'WTTNTUS2': 'Total',
     # Refiner Inputs and Utilization
     'WCRRIUS2': 'Total | Crude Oil',
+    'WCRFPUS2': 'Total | Crude Oil',
+    'WGIRIUS2': 'Total',
+    'WOCLEUS2': 'Total',
+    'WPULEUS3': 'Total',
 }
-
 tab_desc_mappers = [
     ('Weekly Preliminary Crude Imports by Top 10 Countries of Origin (ranking based on 2020 Petroleum Supply Monthly data)',
         'Total | Crude Oil')]
@@ -209,6 +213,7 @@ def build_hierarchy(final_df):
 
     # create the hierarchy as one value per column
     flat_hierarchy_df = build_flat_hierarchy_from_list(hierarchy_df)
+    flat_hierarchy_df = flat_hierarchy_df.drop_duplicates()
 
     # save to csv for upload to mosaic
     pathfile = os.path.join(path, csv_for_hierarchy_result)
