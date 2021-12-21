@@ -5,9 +5,8 @@ and all the mapping
 
 import os
 import pandas as pd
-from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result, \
-    file_for_mosaic_data
-from eia_hierarchy import build_hierarchy_analysis, apply_name_fixes, build_hierarchy
+from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result
+from eia_hierarchy import clean_xls_hierarchy, apply_name_fixes, build_hierarchy, get_original_and_proposed_hierarchy
 from eia_map_product import build_map_product_df
 from eia_map_remaining import add_mappings_and_corrections, extract_into_worksheets
 from eia_metadata import build_clean_metadata, build_raw_metadata
@@ -20,10 +19,9 @@ if __name__ == '__main__':
     build_clean_metadata()
 
     # get the original and proposed naive hierarchy for each symbol
-    # the naive hierarchy is solely described by the manual mapping xls
-    analysis_df = build_hierarchy_analysis()
-
-    # some name fixes are applied to the new hierarchy
+    # and apply lots of name fixes to build a single consistent hierarchy
+    clean_xls_df = clean_xls_hierarchy()
+    analysis_df = get_original_and_proposed_hierarchy(clean_xls_df)
     final_df = apply_name_fixes(analysis_df)
 
     # save it because this relates source_key to hierarchy

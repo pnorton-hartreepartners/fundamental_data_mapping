@@ -12,27 +12,33 @@ from constants import path, xlsx_for_manual_hierarchy, file_for_scrape_result, \
     SOURCE_KEY, TAB_DESCRIPTION, LOCATION, file_for_cleaned_metadata, numbers_as_words, csv_for_hierarchy_result, \
     file_for_mapping_preparation
 
+sourcekey_mapper = {
+    # otherwise labelled as 'Total | Products | Finished Motor Gasoline | Finished Motor Gasoline Excl. Adjustment
+    'W_EPM0F_YPR_NUS_MBBLD': 'Total | Products | Motor Gasoline | Finished Motor Gasoline (Excl. Adjustment)',
+    # Net Imports (Including SPR)
+    'WCRNTUS2': 'Total | Crude Oil',
+    'WRPNTUS2': 'Total | Products',
+    'WTTNTUS2': 'Total',
+    # Refiner Inputs and Utilization
+    'WCRRIUS2': 'Total | Crude Oil',
+}
 
-def build_hierarchy_analysis():
+tab_desc_mappers = [
+    ('Weekly Preliminary Crude Imports by Top 10 Countries of Origin (ranking based on 2020 Petroleum Supply Monthly data)',
+        'Total | Crude Oil')]
+
+HIERARCHY_KEY = 'HierarchyKey'
+
+
+def clean_xls_hierarchy():
     # collect manual mapping from xls
     x = pd.ExcelFile(xlsx_for_manual_hierarchy)
     sheets_dict = {sheet_name: x.parse(sheet_name) for sheet_name in x.sheet_names if sheet_name.startswith('all')}
     raw_mapping_df = pd.concat(sheets_dict.values(), axis='index')
 
-    # need the scrape result for the hierarchy name
-    pathfile = os.path.join(path, file_for_scrape_result)
-    scrape_result_df = pd.read_pickle(pathfile)
-
-    # need the metadata for the table names and locations
-    pathfile = os.path.join(path, file_for_cleaned_metadata)
-    metadata_df = pd.read_pickle(pathfile)
-
-    # ================================================================
-    # clean the raw data
     clean_mapping_df = raw_mapping_df.copy(deep=True)
 
     # rename column
-    HIERARCHY_KEY = 'HierarchyKey'
     clean_mapping_df.rename(columns={'Imports': HIERARCHY_KEY}, inplace=True)
 
     # and drop this; because its manually added in xls and incomplete
@@ -42,45 +48,64 @@ def build_hierarchy_analysis():
     mask = pd.isnull(clean_mapping_df[SOURCE_KEY])
     clean_mapping_df = clean_mapping_df[~mask]
 
-    # and finally add a trivial mapping for our Imports table
-    # obviously this was missing from the xls
-    mask1 = metadata_df[TAB_DESCRIPTION] == 'Imports'
+    # and finally add 1:1 mappings as follows
+    #   1) our Imports table; which isnt explicit in the xls
+    #   2) a mapping for crude imports by country which is a table
+    #      thats available from the api but isnt present in the scrape
+
+    # need the metadata for the table names and locations
+    pathfile = os.path.join(path, file_for_cleaned_metadata)
+    metadata_df = pd.read_pickle(pathfile)
+
+    from_table, to_hierarchy = tab_desc_mappers[0]
+    tables = ['Imports', from_table]
+    mask1 = metadata_df[TAB_DESCRIPTION].isin(tables)
     mask2 = metadata_df[LOCATION] == 'U.S.'
     data = metadata_df[mask1 & mask2].index
     columns = [HIERARCHY_KEY, SOURCE_KEY]
     imports_df = pd.DataFrame(data=np.array([data, data]).T, columns=columns)
 
-    clean_mapping_df = pd.concat([clean_mapping_df, imports_df], axis='index')
+    return pd.concat([clean_mapping_df, imports_df], axis='index')
 
-    # ================================================================
+
+def get_original_and_proposed_hierarchy(clean_mapping_df):
     # get the original scrape hierarchy
     # and the proposed mapped hierarchy side-by-side
+    pathfile = os.path.join(path, file_for_scrape_result)
+    scrape_result_df = pd.read_pickle(pathfile)
+
+    pathfile = os.path.join(path, file_for_cleaned_metadata)
+    metadata_df = pd.read_pickle(pathfile)
 
     # get the original scraped hierarchy, just for US location
-    original_hierarchy_df = pd.merge(scrape_result_df, metadata_df[[TAB_DESCRIPTION, LOCATION]],
+    # there are nans in here because we collect more from the
+    # api than appears in the webscrape
+    mask_location = metadata_df[LOCATION] == 'U.S.'
+    scrape_hierarchy_df = pd.merge(metadata_df.loc[mask_location, [TAB_DESCRIPTION, LOCATION]],
+                                     scrape_result_df,
+                                     how='left',
                                      left_index=True, right_index=True)
-    mask_location = original_hierarchy_df[LOCATION] == 'U.S.'
-    mask_table = original_hierarchy_df[TAB_DESCRIPTION] == 'Imports'
+
+    # attach the original hierarchy from the web scrape
     columns = ['full_name', TAB_DESCRIPTION, LOCATION]
+    original_hierarchy_df = pd.merge(scrape_hierarchy_df[columns],
+                                     clean_mapping_df,
+                                     how='left',
+                                     left_index=True, right_on=SOURCE_KEY)
+    original_hierarchy_df.rename(columns={'full_name': 'original_hierarchy'}, inplace=True)
+    original_hierarchy_df.set_index(SOURCE_KEY, drop=True, inplace=True)
 
     # add the new proposed hierarchy, requested by the manual mapping, from the Imports table
-    result_df1 = pd.merge(original_hierarchy_df.loc[mask_location & mask_table][columns],
-                          clean_mapping_df,
-                          how='left',
-                          left_index=True, right_on=HIERARCHY_KEY)
-    result_df1.rename(columns={'full_name': 'new_hierarchy'}, inplace=True)
-    result_df1.set_index(SOURCE_KEY, drop=True, inplace=True)
-
-    # and the original hierarchy from the web scrape
-    result_df2 = pd.merge(original_hierarchy_df.loc[mask_location, columns],
-                          clean_mapping_df,
-                          how='left',
-                          left_index=True, right_on=SOURCE_KEY)
-    result_df2.rename(columns={'full_name': 'original_hierarchy'}, inplace=True)
-    result_df2.set_index(SOURCE_KEY, drop=True, inplace=True)
+    mask_table = scrape_hierarchy_df[TAB_DESCRIPTION] == 'Imports'
+    new_hierarchy_df = pd.merge(scrape_hierarchy_df.loc[mask_table, columns],
+                                clean_mapping_df,
+                                how='right',
+                                left_index=True, right_on=HIERARCHY_KEY)
+    new_hierarchy_df.rename(columns={'full_name': 'new_hierarchy'}, inplace=True)
+    new_hierarchy_df.set_index(SOURCE_KEY, drop=True, inplace=True)
 
     # join the two resultsets
-    result_df = pd.merge(result_df1['new_hierarchy'], result_df2,
+    result_df = pd.merge(new_hierarchy_df['new_hierarchy'], original_hierarchy_df,
                          how='outer',
                          left_index=True, right_index=True)
 
@@ -97,28 +122,19 @@ def build_hierarchy_analysis():
 
 
 def apply_name_fixes(df):
-    mapper = {
-              # otherwise labelled as 'Total | Products | Finished Motor Gasoline | Finished Motor Gasoline Excl. Adjustment
-              'W_EPM0F_YPR_NUS_MBBLD': 'Total | Products | Motor Gasoline | Finished Motor Gasoline (Excl. Adjustment)',
-              # Net Imports (Including SPR)
-              'WCRNTUS2': 'Total | Crude Oil',
-              'WRPNTUS2': 'Total | Products',
-              'WTTNTUS2': 'Total',
-              # Refiner Inputs and Utilization
-              'WCRRIUS2': 'Total | Crude Oil',
-    }
+    # we're going to use lots of string operations so replace nan with empty string
+    mask = pd.isnull(df['new_hierarchy'])
+    df.loc[mask, 'new_hierarchy'] = ''
 
     # all the (non-crude) products category now needs the following prefix
     mask = (df['missing'].values) & (~df['new_hierarchy'].str.contains('Crude'))
     string = 'Products | '
     df.loc[mask, 'new_hierarchy'] = string + df.loc[mask, 'new_hierarchy']
 
-    # delete the word total from anywhere in the path
+    # remove the root node as its copied over in some cases
     # unless that is the entire new_hierarchy
     string = 'Total'  # no lagging space
     mask = df['new_hierarchy'] != string
-
-    # remove the root node as its copied over in some cases
     # escape the pipe delimiter!
     string = 'Total \| '
     df.loc[mask, 'new_hierarchy'] = df.loc[mask, 'new_hierarchy'].str.replace(string, '')
@@ -145,8 +161,13 @@ def apply_name_fixes(df):
     string = '  '
     df['new_hierarchy'] = df['new_hierarchy'].str.replace(string, ' ')
 
+    # fixes based on tab_description
+    for tab_description, hierarchy in tab_desc_mappers:
+        mask = df[TAB_DESCRIPTION] == tab_description
+        df.loc[mask, 'new_hierarchy'] = hierarchy
+
     # fixes based on source key
-    for source_key, hierarchy in mapper.items():
+    for source_key, hierarchy in sourcekey_mapper.items():
         df.at[source_key, 'new_hierarchy'] = hierarchy
 
     # illegal characters for mapper
@@ -196,10 +217,9 @@ def build_hierarchy(final_df):
 
 if __name__ == '__main__':
     # get the original and proposed naive hierarchy for each symbol
-    # the naive hierarchy is solely described by the manual mapping xls
-    analysis_df = build_hierarchy_analysis()
-
-    # some name fixes are applied to the new hierarchy
+    # and apply lots of name fixes to build a single consistent hierarchy
+    clean_xls_df = clean_xls_hierarchy()
+    analysis_df = get_original_and_proposed_hierarchy(clean_xls_df)
     final_df = apply_name_fixes(analysis_df)
 
     # save it because this relates source_key to hierarchy
