@@ -6,6 +6,7 @@ and all the mapping
 import os
 import pandas as pd
 from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result
+from eia_healthcheck_mapping import build_mapping_healthcheck_df
 from eia_hierarchy import clean_xls_hierarchy, apply_name_fixes, build_hierarchy, get_original_and_proposed_hierarchy
 from eia_map_product import build_map_product_df
 from eia_map_remaining import add_mappings_and_corrections, extract_into_worksheets
@@ -52,3 +53,5 @@ if __name__ == '__main__':
         for sheet_name, df in xls_sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
+    # save an xls for analysis
+    build_mapping_healthcheck_df()

@@ -90,12 +90,20 @@ def build_map_product_df():
 
     # apply corrections due to mosaic hierarchy logic
     corrections = [('five:Blended with Fuel Ethanol', 2)]
-    df = apply_path_corrections(mapping_df, corrections)
+    sourcekey_mapping_df = apply_path_corrections(mapping_df, corrections)
+
+    # more contortions; can we map to description instead?
+    metadata_df.set_index(SOURCE_KEY, drop=True, inplace=True)
+    both_df = pd.merge(metadata_df, sourcekey_mapping_df, how='outer', left_index=True, right_index=True)
+    description_mapping_df = both_df[['raw_description', 'mosaic_upload']]
+    description_mapping_df = description_mapping_df.drop_duplicates(ignore_index=True)
+    description_mapping_df.set_index('raw_description', drop=True, inplace=True)
 
     # save file for upload
     pathfile = os.path.join(path, xlsx_for_map_product_result)
     with pd.ExcelWriter(pathfile) as writer:
-        df['mosaic_upload'].to_excel(writer, sheet_name='product_mapping')
+        sourcekey_mapping_df['mosaic_upload'].to_excel(writer, sheet_name='sourcekey_mapping')
+        description_mapping_df['mosaic_upload'].to_excel(writer, sheet_name='description_mapping')
 
 
 if __name__ == '__main__':
