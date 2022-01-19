@@ -1,89 +1,57 @@
 '''
-this script builds all the data for the tableau workbook
-that presents all the weekly eia data
-it includes a scrape of the webpage that defines the hierarchy
+this script builds the hierarchy data for eia products
+and all the mapping
 '''
 
 import os
-
-os.environ['IGNITE_HOST_OVERWRITE'] = 'jdbc.dev.mosaic.hartreepartners.com'
-os.environ['TSDB_HOST'] = 'tsdb-dev.mosaic.hartreepartners.com'
-os.environ['CRATE_HOST'] = 'ttda.cratedb-dev-cluster.mosaic.hartreepartners.com:4200'
-os.environ['MOSAIC_ENV'] = 'DEV'
-
 import pandas as pd
-import argparse
-from analyst_data_views.common.db_flattener import getFlatRawDF
-from constants import path, file_for_mosaic_data, \
-    file_for_raw_metadata, SAVE, LOAD, REFRESH, csv_for_timeseries, \
-    terse_timeseries_columns, file_for_timeseries, xlsx_for_timeseries
-from eia_seasonality_dates import build_seasonality_ts
-from eia_metadata import _get_metadata_df, build_clean_metadata, build_raw_metadata
-from eia_scrape import build_all_scrape
-from eia_trees import build_all_tree_analysis
-
-
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--mode',
-                        help='save, load or refresh',
-                        choices=[SAVE, LOAD, REFRESH],
-                        required=True)
-    return parser.parse_args()
-
-
-def get_full_timeseries(data_mode):
-    if data_mode in [SAVE, REFRESH]:
-        timeseries_df = getFlatRawDF(source='eia-weekly')
-        pathfile = os.path.join(path, file_for_mosaic_data)
-        timeseries_df.to_pickle(pathfile)
-    elif data_mode == LOAD:
-        pathfile = os.path.join(path, file_for_mosaic_data)
-        timeseries_df = pd.read_pickle(pathfile)
-    else:
-        raise NotImplementedError
-    return timeseries_df
-
-
-
-
+from constants import path, file_for_mapping_preparation, file_for_raw_metadata, xlsx_for_map_remaining_result
+from eia_healthcheck_mapping import build_mapping_healthcheck_df
+from eia_hierarchy import clean_xls_hierarchy, apply_name_fixes, build_hierarchy, get_original_and_proposed_hierarchy
+from eia_map_product import build_map_product_df
+from eia_map_remaining import add_mappings_and_corrections, extract_into_worksheets
+from eia_metadata import build_clean_metadata, build_raw_metadata
 
 if __name__ == '__main__':
-    '''
-    python main.py --mode load
-    # refresh means... just refresh the timeseries when new data is published
-    # load means... load the timeseries from the saved pickle
-    # save means... build and save everything
-    '''
-    args = get_args()
+    # build metadata and save to file
+    build_raw_metadata()
 
-    # =============================================================================
-    # create terse timeseries ie sourcekey, date and value only
-    timeseries_df = get_full_timeseries(args.mode)
+    # clean descriptions and locations
+    build_clean_metadata()
 
-    # save as csv for tableau... and pickle for everything else
-    pathfile = os.path.join(path, file_for_timeseries)
-    timeseries_df[terse_timeseries_columns].to_pickle(pathfile)
+    # get the original and proposed naive hierarchy for each symbol
+    # and apply lots of name fixes to build a single consistent hierarchy
+    clean_xls_df = clean_xls_hierarchy()
+    analysis_df = get_original_and_proposed_hierarchy(clean_xls_df)
+    final_df = apply_name_fixes(analysis_df)
 
-    pathfile = os.path.join(path, csv_for_timeseries)
-    timeseries_df[terse_timeseries_columns].to_csv(pathfile, index=False)
+    # save it because this relates source_key to hierarchy
+    # and will be an input to the mapping exercise
+    pathfile = os.path.join(path, file_for_mapping_preparation)
+    final_df.to_pickle(pathfile)
 
-    pathfile = os.path.join(path, xlsx_for_timeseries)
+    # drop dupes and save as csv for upload to mosaic
+    build_hierarchy(final_df)
+
+    # and now the product mapper
+    build_map_product_df()
+
+    # and finally, the remaining measures, units & locations
+    # load the raw metadata (dont want the cleaned one)
+    file = os.path.join(path, file_for_raw_metadata)
+    metadata_df = pd.read_pickle(file)
+
+    # one big metadata_df with extra columns for mappings and values being dictionaries that match the hierarchies
+    df = add_mappings_and_corrections(metadata_df)
+
+    # break out the mapping dictionaries into df columns and create dfs for upload
+    xls_sheets = extract_into_worksheets(df)
+
+    # save as xls
+    pathfile = os.path.join(path, xlsx_for_map_remaining_result)
     with pd.ExcelWriter(pathfile) as writer:
-        timeseries_df[terse_timeseries_columns].to_excel(writer, sheet_name='timeseries')
+        for sheet_name, df in xls_sheets.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    # build seasonality dates... run every week in case of changes to reporting dates
-    build_seasonality_ts()
-
-    if args.mode == SAVE:
-        # build metadata and save to file
-        build_raw_metadata()
-
-        # clean names and locations
-        build_clean_metadata()
-
-        # run webscrape, build metadata and save to file
-        build_all_scrape()
-
-        # identify leaf nodes
-        build_all_tree_analysis()
+    # save an xls for analysis
+    build_mapping_healthcheck_df()
