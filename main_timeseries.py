@@ -45,12 +45,9 @@ def get_full_timeseries(data_mode):
     return timeseries_df
 
 
-
-
-
 if __name__ == '__main__':
     '''
-    python zzz_main.py --mode load
+    python main_timeseries.py --mode refresh
     # refresh means... just refresh the timeseries when new data is published
     # load means... load the timeseries from the saved pickle
     # save means... build and save everything
